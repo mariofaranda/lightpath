@@ -35,6 +35,28 @@ canvas {
   height: 16px;
 }
 
+.graticule-toggle-overlay {
+  position: absolute;
+  bottom: 50px;
+  left: 20px;
+  pointer-events: all;
+}
+
+.graticule-toggle-overlay label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.graticule-toggle-overlay input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
 .flight-info-center {
   display: flex;
   flex-direction: column;

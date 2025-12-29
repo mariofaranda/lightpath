@@ -19,6 +19,7 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [animationProgress, setAnimationProgress] = useState(0) // 0 to 1
   const [showAirports, setShowAirports] = useState(false)
+  const [showGraticule, setShowGraticule] = useState(false)
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false)
   
   // Store scene reference to add/remove flight path
@@ -824,6 +825,120 @@ function App() {
       }
     }, [showAirports, airports])
 
+    // Effect to show/hide graticule
+    useEffect(() => {
+      if (!sceneRef.current) return
+      
+      let fadeInterval = null
+      
+      // Remove existing graticule if exists
+      const existingGraticule = sceneRef.current.getObjectByName('graticule')
+      if (existingGraticule) {
+        let opacity = 0.3 // Start from current opacity
+        
+        const fadeOut = setInterval(() => {
+          opacity -= 0.02
+          if (opacity <= 0) {
+            clearInterval(fadeOut)
+            sceneRef.current.remove(existingGraticule)
+            existingGraticule.traverse((child) => {
+              if (child.geometry) child.geometry.dispose()
+              if (child.material) child.material.dispose()
+            })
+          } else {
+            // Update all child materials
+            existingGraticule.traverse((child) => {
+              if (child.material) {
+                child.material.opacity = opacity
+              }
+            })
+          }
+        }, 20)
+      }
+      
+      if (!showGraticule) return
+      
+      // Load and render graticule
+      fetch('/graticule-10.geojson')
+        .then(res => res.json())
+        .then(data => {
+          const graticuleGroup = new THREE.Group()
+          graticuleGroup.name = 'graticule'
+          
+          // Convert lat/lon to 3D
+          const latLonToVector3 = (lon, lat, radius) => {
+            const phi = (90 - lat) * (Math.PI / 180)
+            const theta = (lon + 180) * (Math.PI / 180)
+            
+            return new THREE.Vector3(
+              -radius * Math.sin(phi) * Math.cos(theta),
+              radius * Math.cos(phi),
+              radius * Math.sin(phi) * Math.sin(theta)
+            )
+          }
+          
+          // Process each feature (line)
+          data.features.forEach(feature => {
+            if (feature.geometry.type === 'LineString') {
+              const coords = feature.geometry.coordinates
+              const points = coords.map(coord => 
+                latLonToVector3(coord[0], coord[1], 2.004)
+              )
+              
+              const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
+              const lineMaterial = new THREE.LineBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0 // Start invisible for fade-in
+              })
+              
+              const line = new THREE.Line(lineGeometry, lineMaterial)
+              graticuleGroup.add(line)
+            } else if (feature.geometry.type === 'MultiLineString') {
+              feature.geometry.coordinates.forEach(lineCoords => {
+                const points = lineCoords.map(coord => 
+                  latLonToVector3(coord[0], coord[1], 2.004)
+                )
+                
+                const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
+                const lineMaterial = new THREE.LineBasicMaterial({
+                  color: 0xffffff,
+                  transparent: true,
+                  opacity: 0
+                })
+                
+                const line = new THREE.Line(lineGeometry, lineMaterial)
+                graticuleGroup.add(line)
+              })
+            }
+          })
+          
+          sceneRef.current.add(graticuleGroup)
+          
+          // Fade in
+          let opacity = 0
+          fadeInterval = setInterval(() => {
+            opacity += 0.02
+            if (opacity >= 0.3) {
+              opacity = 0.3
+              clearInterval(fadeInterval)
+            }
+            graticuleGroup.traverse((child) => {
+              if (child.material) {
+                child.material.opacity = opacity
+              }
+            })
+          }, 20)
+          
+          console.log('Graticule loaded with', data.features.length, 'features')
+        })
+        .catch(err => console.error('Error loading graticule:', err))
+      
+      return () => {
+        if (fadeInterval) clearInterval(fadeInterval)
+      }
+    }, [showGraticule])
+
     useEffect(() => {
       if (!isPlaying || !flightDataRef.current) return
       
@@ -1049,6 +1164,17 @@ function App() {
               onChange={(e) => setShowAirports(e.target.checked)}
             />
             <span>Show all airports</span>
+          </label>
+        </div>
+
+        <div className="graticule-toggle-overlay">
+          <label>
+            <input 
+              type="checkbox"
+              checked={showGraticule}
+              onChange={(e) => setShowGraticule(e.target.checked)}
+            />
+            <span>Show graticule</span>
           </label>
         </div>
         
