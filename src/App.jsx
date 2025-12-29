@@ -717,14 +717,28 @@ function App() {
         return sprite
       }
 
-      const departureLabel = createTextLabel(departureCode)
-      const departureLabelPos = latLonToVector3(departure.lat, departure.lon, 2.05)
-      departureLabel.position.copy(departureLabelPos)
+      // Create labels with offset
+      const createLabelWithOffset = (code, lat, lon) => {
+        const label = createTextLabel(code)
+        
+        // Position at airport location
+        const basePos = latLonToVector3(lat, lon, 2.05)
+        
+        // Calculate "down" offset (toward south pole from this point)
+        const offsetLat = lat - 2 // Move 3 degrees south
+        const offsetPos = latLonToVector3(offsetLat, lon, 2.05)
+        
+        // Offset is the difference
+        const offset = offsetPos.clone().sub(basePos).normalize().multiplyScalar(0.08)
+        
+        label.position.copy(basePos.add(offset))
+        return label
+      }
+
+      const departureLabel = createLabelWithOffset(departureCode, departure.lat, departure.lon)
       flightGroup.add(departureLabel)
 
-      const arrivalLabel = createTextLabel(arrivalCode)
-      const arrivalLabelPos = latLonToVector3(arrival.lat, arrival.lon, 2.05)
-      arrivalLabel.position.copy(arrivalLabelPos)
+      const arrivalLabel = createLabelWithOffset(arrivalCode, arrival.lat, arrival.lon)
       flightGroup.add(arrivalLabel)
 
       sceneRef.current.add(flightGroup)
@@ -737,13 +751,27 @@ function App() {
     // Effect to show/hide all airports
     useEffect(() => {
       if (!sceneRef.current || !airports) return
+
+      let fadeInterval = null
       
-      // Remove existing airport dots if they exist
+      // Remove existing airport dots with fade out
       const existingDots = sceneRef.current.getObjectByName('airportDots')
       if (existingDots) {
-        sceneRef.current.remove(existingDots)
-        existingDots.geometry.dispose()
-        existingDots.material.dispose()
+        const material = existingDots.material
+        let opacity = material.opacity
+        
+        const fadeOut = setInterval(() => {
+          opacity -= 0.02
+          if (opacity <= 0) {
+            opacity = 0
+            clearInterval(fadeOut)
+            sceneRef.current.remove(existingDots)
+            existingDots.geometry.dispose()
+            material.dispose()
+          } else {
+            material.opacity = opacity
+          }
+        }, 20)
       }
       
       if (!showAirports) return
@@ -769,17 +797,31 @@ function App() {
       
       const material = new THREE.PointsMaterial({
         color: 0xffffff,
-        size: 0.006,
+        size: 0.004,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.5
+        opacity: 0  // Start invisible
       })
       
       const points = new THREE.Points(geometry, material)
       points.name = 'airportDots'
       sceneRef.current.add(points)
+
+      // Fade in animation
+      let opacity = 0
+      const fadeIn = setInterval(() => {
+        opacity += 0.02
+        if (opacity >= 0.6) {
+          opacity = 0.6
+          clearInterval(fadeIn)
+        }
+        material.opacity = opacity
+      }, 20) // Update every 20ms
       
       console.log('Rendered', airportList.length, 'airports')
+      return () => {
+        if (fadeInterval) clearInterval(fadeInterval)
+      }
     }, [showAirports, airports])
 
     useEffect(() => {
@@ -871,7 +913,7 @@ function App() {
       const distance = earthRadius * angularDistance
       
       // Estimate flight duration (average cruise speed ~850 km/h)
-      const cruiseSpeed = 850 // km/h
+      const cruiseSpeed = 750 // km/h
       const flightDurationHours = distance / cruiseSpeed
       const flightDurationMs = flightDurationHours * 60 * 60 * 1000
       
@@ -993,6 +1035,22 @@ function App() {
           <div className="time">{simulatedTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
           <div className="date">{simulatedTime.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</div>
         </div>
+
+        <div className="info-overlay">
+          <div className="time">{simulatedTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+          <div className="date">{simulatedTime.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+        </div>
+
+        <div className="airport-toggle-overlay">
+          <label>
+            <input 
+              type="checkbox"
+              checked={showAirports}
+              onChange={(e) => setShowAirports(e.target.checked)}
+            />
+            <span>Show all airports</span>
+          </label>
+        </div>
         
         <div className={`flight-input ${isPanelCollapsed ? 'collapsed' : ''}`}>
           <div className="panel-header">
@@ -1061,16 +1119,6 @@ function App() {
               </div>
             )}
     
-            <div className="airport-toggle">
-              <label>
-                <input 
-                  type="checkbox"
-                  checked={showAirports}
-                  onChange={(e) => setShowAirports(e.target.checked)}
-                />
-                <span>Show all airports</span>
-              </label>
-            </div>
           </div>
         </div>
         
@@ -1134,7 +1182,14 @@ function App() {
             
             <button 
               className="play-button"
-              onClick={() => setIsPlaying(!isPlaying)}
+              onClick={() => {
+                if (animationProgress >= 1) {
+                  // Reset to beginning if at end
+                  setAnimationProgress(0)
+                  animationProgressRef.current = 0
+                }
+                setIsPlaying(!isPlaying)
+              }}
             >
               {isPlaying ? '⏸ Pause' : '▶ Play'}
             </button>
