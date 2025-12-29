@@ -13,6 +13,13 @@ canvas {
   height: 100%;
 }
 
+.flight-info-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
 .info-overlay {
   position: absolute;
   top: 20px;
@@ -155,12 +162,15 @@ canvas {
   bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 20px 30px;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   min-width: 400px;
-  display: none; /* Hidden by default */
+  display: none;
 }
 
 .animation-controls.visible {
@@ -171,18 +181,51 @@ canvas {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-}
-
-.animation-time {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
+  margin-bottom: 16px;
+  gap: 20px;
 }
 
 .animation-route {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.animation-time {
   font-size: 12px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.airport-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.airport-time-left {
+  align-items: flex-start;
+}
+
+.airport-time-right {
+  align-items: flex-end;
+}
+
+.airport-code {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.time-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
 }
 
 .slider-container {

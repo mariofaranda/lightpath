@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import './App.css'
 import SunCalc from 'suncalc'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import tzlookup from 'tz-lookup'
+import { DateTime } from 'luxon'
 
 function App() {
   const canvasRef = useRef(null)
@@ -721,6 +723,29 @@ function App() {
       
     }
 
+    const getAirportTimezone = (airport) => {
+      try {
+        const tz = tzlookup(airport.lat, airport.lon)
+        return tz
+      } catch (e) {
+        // Fallback to UTC offset if lookup fails
+        const offset = Math.round(airport.lon / 15)
+        return `UTC${offset >= 0 ? '+' : ''}${offset}`
+      }
+    }
+    
+    const getLocalTimeAtAirport = (utcTime, airport) => {
+      const timezone = getAirportTimezone(airport)
+      const dt = DateTime.fromJSDate(utcTime, { zone: timezone })
+      return dt.toFormat('HH:mm')
+    }
+    
+    const getTimezoneAbbreviation = (airport) => {
+      const timezone = getAirportTimezone(airport)
+      const dt = DateTime.now().setZone(timezone)
+      return dt.toFormat('ZZZZ') // Returns abbreviation like "PST", "CET"
+    }
+
     const formatFlightTime = (progress, results) => {
       const totalMins = results.durationHours * 60 + results.durationMins
       const elapsedMins = Math.round(progress * totalMins)
@@ -798,13 +823,37 @@ function App() {
           {flightResults && (
             <div className={`animation-controls ${flightPath ? 'visible' : ''}`}>
               <div className="animation-header">
-                <div>
+                <div className="airport-time airport-time-left">
+                  <span className="airport-code">
+                    {flightDataRef.current && getTimezoneAbbreviation(flightDataRef.current.departure)}
+                  </span>
+                  <span className="time-value">
+                    {flightDataRef.current && getLocalTimeAtAirport(
+                      new Date(flightDataRef.current.departureTime.getTime() + animationProgress * flightDataRef.current.flightDurationMs),
+                      flightDataRef.current.departure
+                    )}
+                  </span>
+                </div>
+
+                <div className="flight-info-center">
                   <div className="animation-route">
                     {departureCode} → {arrivalCode}
                   </div>
                   <div className="animation-time">
                     {formatFlightTime(animationProgress, flightResults)}
                   </div>
+                </div>
+
+                <div className="airport-time airport-time-right">
+                  <span className="airport-code">
+                    {flightDataRef.current && getTimezoneAbbreviation(flightDataRef.current.arrival)}
+                  </span>
+                  <span className="time-value">
+                    {flightDataRef.current && getLocalTimeAtAirport(
+                      new Date(flightDataRef.current.departureTime.getTime() + animationProgress * flightDataRef.current.flightDurationMs),
+                      flightDataRef.current.arrival
+                    )}
+                  </span>
                 </div>
               </div>
               
