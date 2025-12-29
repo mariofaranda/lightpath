@@ -76,8 +76,8 @@ function App() {
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true  // Smooth motion
     controls.dampingFactor = 0.05
-    controls.minDistance = 3  // How close you can zoom
-    controls.maxDistance = 10  // How far you can zoom
+    controls.minDistance = 4  // How close you can zoom
+    controls.maxDistance = 4  // How far you can zoom
     controls.enablePan = false  // Disable panning
 
     // 4. Create a sphere (our Earth)
@@ -100,6 +100,31 @@ function App() {
 
     const sphere = new THREE.Mesh(geometry, material)
     scene.add(sphere)
+
+    // Add atmospheric glow
+    const glowGeometry = new THREE.SphereGeometry(2.15, 64, 64)
+    const glowMaterial = new THREE.ShaderMaterial({
+      uniforms: {},
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+          gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0) * intensity;
+        }
+      `,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+      transparent: true
+    })
+    const atmosphereGlow = new THREE.Mesh(glowGeometry, glowMaterial)
+    scene.add(atmosphereGlow)
 
     // Add a marker at user location
     const dotGeometry = new THREE.SphereGeometry(0.01, 32, 32)
@@ -254,6 +279,12 @@ function App() {
 
       // Update sun position
       updateSunPosition()
+
+      // Keep location dot constant size
+      const currentDistance = camera.position.length()
+      const baseDistance = 5  // Initial camera distance
+      const dotScale = currentDistance / baseDistance
+      dot.scale.setScalar(dotScale)
       
       controls.update()
       renderer.render(scene, camera)
