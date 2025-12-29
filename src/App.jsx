@@ -505,6 +505,7 @@ function App() {
 
       sceneRef.current.add(flightGroup)
       flightLineRef.current = flightGroup
+      hasFlightPathRef.current = true
 
       console.log('Flight path with markers drawn')
     }, [flightPath])
@@ -656,7 +657,6 @@ function App() {
       
       // Trigger flight path drawing
       setFlightPath({ departure, arrival })
-      hasFlightPathRef.current = true
 
       // Store flight data for animation
       flightDataRef.current = {
@@ -668,6 +668,8 @@ function App() {
 
       // Reset animation progress when new flight is calculated
       setAnimationProgress(0)
+      animationProgressRef.current = 0
+      
     }
 
     const formatFlightTime = (progress, results) => {

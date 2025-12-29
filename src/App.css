@@ -196,6 +196,7 @@ canvas {
   background: #ddd;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .time-slider::-webkit-slider-thumb {
