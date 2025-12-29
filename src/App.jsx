@@ -89,8 +89,8 @@ function App() {
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true  // Smooth motion
     controls.dampingFactor = 0.05
-    controls.minDistance = 4  // How close you can zoom
-    controls.maxDistance = 4  // How far you can zoom
+    controls.minDistance = 3.5  // How close you can zoom
+    controls.maxDistance = 3.5  // How far you can zoom
     controls.enablePan = false  // Disable panning
 
     // 4. Create a sphere (our Earth)
@@ -1313,6 +1313,10 @@ function App() {
                   // Reset to beginning if at end
                   setAnimationProgress(0)
                   animationProgressRef.current = 0
+                }
+                // Collapse panel when starting to play
+                if (!isPlaying) {
+                  setIsPanelCollapsed(true)
                 }
                 setIsPlaying(!isPlaying)
               }}

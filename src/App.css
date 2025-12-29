@@ -98,7 +98,8 @@ canvas {
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   font-family: system-ui, -apple-system, sans-serif;
-  min-width: 400px;
+  width: 400px;
+  transition: padding 0.25s ease-in-out;
 }
 
 .flight-input h3 {
@@ -207,7 +208,7 @@ canvas {
 
 .animation-controls {
   position: absolute;
-  bottom: 40px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.1);
@@ -339,20 +340,17 @@ canvas {
   margin-top: 4px;
 }
 
-.flight-input:not(.collapsed) .panel-header {
-  padding-bottom: 16px;
-}
-
-.flight-input.collapsed .panel-header {
-  margin-bottom: 0;
-}
-
 .flight-input.collapsed {
-  padding: 12px 20px;
+  padding-bottom: 6px;
 }
 
 .flight-input.collapsed .panel-content {
-  display: none !important;
+  max-height: 0 !important;
+  opacity: 0 !important;
+}
+
+.flight-input.collapsed .panel-header {
+  margin-bottom: 16px;
 }
 
 .panel-header {
@@ -391,4 +389,11 @@ canvas {
 .flight-input .collapse-button:hover {
   color: rgba(255, 255, 255, 0.9) !important;
   background: none !important;
+}
+
+.panel-content {
+  overflow: hidden;
+  max-height: 1000px;
+  opacity: 1;
+  transition: max-height 0.25s ease-in-out, opacity 0.2s ease-in-out;
 }
