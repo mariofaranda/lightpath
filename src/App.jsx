@@ -499,7 +499,7 @@ function App() {
           const curve = flightLineRef.current.userData.routeCurve
           const segmentData = flightLineRef.current.userData.segmentData
           const completedPoints = []
-          const numSamples = 100
+          const numSamples = 400
           
           for (let i = 0; i <= numSamples; i++) {
             const t = (i / numSamples) * progress
@@ -537,24 +537,36 @@ function App() {
                 r = 1.0
                 g = 0.85
                 b = 0.0
-              } else if (sunAngle < 90) {
-                // Civil twilight - gold to orange (5°)
-                const t = (sunAngle - 85) / 5
+              } else if (sunAngle < 88) {
+                // Early twilight - gold to amber (3°)
+                const t = (sunAngle - 85) / 3
                 r = 1.0
-                g = 0.85 - t * 0.35
-                b = 0.0 + t * 0.15
-              } else if (sunAngle < 95) {
-                // Nautical twilight - orange to purple (5°)
-                const t = (sunAngle - 90) / 5
-                r = 1.0 - t * 0.4
-                g = 0.5 - t * 0.3
-                b = 0.15 + t * 0.55
+                g = 0.85 - t * 0.2
+                b = 0.0 + t * 0.1
+              } else if (sunAngle < 91) {
+                // Amber to orange (3°)
+                const t = (sunAngle - 88) / 3
+                r = 1.0
+                g = 0.65 - t * 0.15
+                b = 0.1 + t * 0.15
+              } else if (sunAngle < 94) {
+                // Orange to red-orange (3°)
+                const t = (sunAngle - 91) / 3
+                r = 1.0 - t * 0.2
+                g = 0.5 - t * 0.15
+                b = 0.25 + t * 0.2
+              } else if (sunAngle < 97) {
+                // Red-orange to purple (3°)
+                const t = (sunAngle - 94) / 3
+                r = 0.8 - t * 0.2
+                g = 0.35 - t * 0.15
+                b = 0.45 + t * 0.25
               } else if (sunAngle < 100) {
-                // Deep twilight - purple to navy (5°)
-                const t = (sunAngle - 95) / 5
-                r = 0.6 - t * 0.5   // 0.6 → 0.1 (match night red)
-                g = 0.2 - t * 0.05  // 0.2 → 0.15 (match night green)
-                b = 0.7 - t * 0.2   // 0.7 → 0.5 (match night blue)
+                // Purple to indigo (3°)
+                const t = (sunAngle - 97) / 3
+                r = 0.6 - t * 0.5
+                g = 0.2 - t * 0.05
+                b = 0.7 - t * 0.2
               } else {
                 // Night - navy blue
                 r = 0.1
@@ -569,7 +581,7 @@ function App() {
             // Create single tube with vertex colors
             const thickGeometry = new THREE.TubeGeometry(
               new THREE.CatmullRomCurve3(completedPoints),
-              completedPoints.length - 1,
+              Math.min(completedPoints.length * 2, 400),  // More tubular segments
               0.006,
               8,
               false
@@ -578,7 +590,7 @@ function App() {
             // Apply vertex colors
             const colorArray = new Float32Array(colors.length * thickGeometry.attributes.position.count / completedPoints.length)
             for (let i = 0; i < thickGeometry.attributes.position.count; i++) {
-              const pointIndex = Math.floor(i / (thickGeometry.attributes.position.count / completedPoints.length))
+              const pointIndex = Math.floor(i * completedPoints.length / thickGeometry.attributes.position.count)
               const colorIndex = Math.min(pointIndex * 3, colors.length - 3)
               colorArray[i * 3] = colors[colorIndex]
               colorArray[i * 3 + 1] = colors[colorIndex + 1]
@@ -1246,7 +1258,7 @@ function App() {
       // Calculate total animation duration based on distance
       const animationDurationMs = (flightDistanceKm / kmPerSecond) * 1000
       
-      const updateInterval = 50
+      const updateInterval = 16
       const increment = updateInterval / animationDurationMs
       
       const interval = setInterval(() => {
@@ -1408,7 +1420,7 @@ function App() {
       console.log('Estimated duration:', flightDurationHours.toFixed(2), 'hours')
       
       // Sample points along the route and check daylight
-      const numSamples = 100
+      const numSamples = 800
       let daylightSegments = 0
       let darknessSegments = 0
 
