@@ -45,6 +45,7 @@ function App() {
   const [aboutContent, setAboutContent] = useState('')
   const [dataContent, setDataContent] = useState('')
   const [isClosing, setIsClosing] = useState(false)
+  const [currentTimezone, setCurrentTimezone] = useState(null)
 
   
   // Store scene reference to add/remove flight path
@@ -58,6 +59,8 @@ function App() {
   const showPlaneIconRef = useRef(true)
   const showCloudsRef = useRef(false)
   const cloudLayerRef = useRef(null)
+  const timezoneDataRef = useRef(null)
+  const timezoneFadeIntervalRef = useRef(null)
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -640,6 +643,16 @@ function App() {
           const surfaceOffset = normal.clone().multiplyScalar(0.02) // Adjust this value
           const forwardOffset = tangent.clone().multiplyScalar(0.035)  // Adjust this value
           planeIconRef.current.position.copy(position).add(surfaceOffset).add(forwardOffset)
+
+          // Detect current timezone
+          const lat = Math.asin(position.y / position.length()) * 180 / Math.PI
+          const theta = Math.atan2(position.z, -position.x)
+          const lon = (theta * 180 / Math.PI) - 180
+          const timezone = getTimezoneAtPoint(lat, lon)
+
+          if (timezone !== currentTimezone) {
+            setCurrentTimezone(timezone)
+          }
           
           // Set orientation using basis vectors
           const matrix = new THREE.Matrix4()
@@ -1171,6 +1184,8 @@ function App() {
       fetch('/timezones.geojson')
         .then(res => res.json())
         .then(data => {
+          timezoneDataRef.current = data
+
           const timezoneGroup = new THREE.Group()
           timezoneGroup.name = 'timezone-boundaries'
           
@@ -1187,7 +1202,9 @@ function App() {
           }
           
           // Process each feature (timezone boundary)
-          data.features.forEach(feature => {
+          data.features.forEach((feature, featureIndex) => {
+            const timezoneName = feature.properties.tzid || feature.properties.name || `timezone-${featureIndex}`
+            
             if (feature.geometry.type === 'Polygon') {
               feature.geometry.coordinates.forEach(ring => {
                 const points = ring.map(coord => 
@@ -1196,12 +1213,13 @@ function App() {
                 
                 const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
                 const lineMaterial = new THREE.LineBasicMaterial({
-                  color: 0xffffff,  // White for timezone boundaries
+                  color: 0xffffff,
                   transparent: true,
                   opacity: 0
                 })
                 
                 const line = new THREE.Line(lineGeometry, lineMaterial)
+                line.userData.timezone = timezoneName  // Store timezone identifier
                 timezoneGroup.add(line)
               })
             } else if (feature.geometry.type === 'MultiPolygon') {
@@ -1219,6 +1237,7 @@ function App() {
                   })
                   
                   const line = new THREE.Line(lineGeometry, lineMaterial)
+                  line.userData.timezone = timezoneName  // Store timezone identifier
                   timezoneGroup.add(line)
                 })
               })
@@ -1234,6 +1253,7 @@ function App() {
             if (opacity >= 0.3) {  // Subtle white lines
               opacity = 0.3
               clearInterval(fadeInterval)
+              timezoneFadeIntervalRef.current = null
             }
             timezoneGroup.traverse((child) => {
               if (child.material) {
@@ -1248,6 +1268,7 @@ function App() {
       
       return () => {
         if (fadeInterval) clearInterval(fadeInterval)
+        if (timezoneFadeIntervalRef.current) clearInterval(timezoneFadeIntervalRef.current)
       }
     }, [showTimezones])
 
@@ -1332,6 +1353,23 @@ function App() {
       }
 
     }, [isPlaying, flightResults, animationProgress, showAirports, showPlaneIcon, showTimezones, showGraticule, showClouds])
+
+    // Highlight current timezone during flight
+    useEffect(() => {
+      if (!sceneRef.current) return
+      
+      const timezoneGroup = sceneRef.current.getObjectByName('timezone-boundaries')
+      if (!timezoneGroup) return
+      
+      timezoneGroup.traverse((child) => {
+        if (child.isLine && child.material) {
+          const isCurrentZone = child.userData.timezone === currentTimezone
+          child.material.opacity = isCurrentZone ? 0.9 : 0.3
+          child.material.color.setHex(isCurrentZone ? 0xc2dae6 : 0xffffff)  
+        }
+        
+      })
+    }, [currentTimezone])
 
     const isPointInDaylight = (lat, lon, time) => {
       // Get subsolar point at this time
@@ -1620,6 +1658,44 @@ function App() {
       } catch (error) {
         console.error('Error loading content:', error)
       }
+    }
+
+    const getTimezoneAtPoint = (lat, lon) => {
+      if (!timezoneDataRef.current) return null
+      
+      // Check each timezone polygon to see if point is inside
+      for (const feature of timezoneDataRef.current.features) {
+        const timezoneName = feature.properties.tzid || feature.properties.name
+        
+        // Simple point-in-polygon test (works for most cases)
+        if (feature.geometry.type === 'Polygon') {
+          if (isPointInPolygon([lon, lat], feature.geometry.coordinates[0])) {
+            return timezoneName
+          }
+        } else if (feature.geometry.type === 'MultiPolygon') {
+          for (const polygon of feature.geometry.coordinates) {
+            if (isPointInPolygon([lon, lat], polygon[0])) {
+              return timezoneName
+            }
+          }
+        }
+      }
+      
+      return null
+    }
+
+    // Point-in-polygon algorithm (ray casting)
+    const isPointInPolygon = (point, polygon) => {
+      let inside = false
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1]
+        const xj = polygon[j][0], yj = polygon[j][1]
+        
+        const intersect = ((yi > point[1]) !== (yj > point[1]))
+          && (point[0] < (xj - xi) * (point[1] - yi) / (yj - yi) + xi)
+        if (intersect) inside = !inside
+      }
+      return inside
     }
 
     return (
