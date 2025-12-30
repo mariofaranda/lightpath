@@ -111,7 +111,7 @@ function App() {
       0.1,  // near clipping plane
       1000  // far clipping plane
     )
-    camera.position.z = 5  // move camera back so we can see the sphere
+    camera.position.z = 3.5  // move camera back so we can see the sphere
     cameraRef.current = camera 
 
     // 3. Create the renderer
@@ -128,8 +128,9 @@ function App() {
     controls.enableDamping = true  // Smooth motion
     controls.dampingFactor = 0.05
     controlsRef.current = controls
-    controls.minDistance = 3.5  // How close you can zoom
+    controls.minDistance = 3  // How close you can zoom
     controls.maxDistance = 3.5  // How far you can zoom
+    controls.enableZoom = false
     controls.enablePan = false  // Disable panning
     controls.autoRotate = true  // Enable auto-rotation
     controls.autoRotateSpeed = -0.1  // Adjust speed (positive = counter-clockwise)
@@ -976,8 +977,8 @@ function App() {
       
       const material = new THREE.PointsMaterial({
         color: 0xffffff,
-        size: 0.004,
-        sizeAttenuation: true,
+        size: 1.2,
+        sizeAttenuation: false,
         transparent: true,
         opacity: 0  // Start invisible
       })
@@ -1317,12 +1318,13 @@ function App() {
       return angularDistance < 90
     }
 
-    const centerCameraOnFlight = (departure, arrival) => {
+    const centerCameraOnFlight = (departure, arrival, flightDistance) => {
       const camera = cameraRef.current
       const controls = controlsRef.current
-      if (!camera || !controls) {
-        return
-      }
+      if (!camera || !controls) return
+      
+      // Zoom in for short flights
+      const radius = flightDistance < 500 ? 3.0 : 3.5
       
       // Calculate midpoint
       const midLat = (departure.lat + arrival.lat) / 2
@@ -1331,7 +1333,6 @@ function App() {
       // Calculate target camera position
       const phi = (90 - midLat) * (Math.PI / 180)
       const theta = (midLon + 180) * (Math.PI / 180)
-      const radius = 4
       
       const targetPosition = new THREE.Vector3(
         -radius * Math.sin(phi) * Math.cos(theta),
@@ -1341,14 +1342,13 @@ function App() {
       
       // Smooth animation to target position
       const startPosition = camera.position.clone()
-      const duration = 1500 // ms
+      const duration = 1500
       const startTime = Date.now()
       
       const animateCamera = () => {
         const elapsed = Date.now() - startTime
         const progress = Math.min(elapsed / duration, 1)
         
-        // Ease-in-out
         const eased = progress < 0.5
           ? 2 * progress * progress
           : 1 - Math.pow(-2 * progress + 2, 2) / 2
@@ -1484,7 +1484,7 @@ function App() {
       animationProgressRef.current = 0
 
       // Center camera on flight path
-      centerCameraOnFlight(departure, arrival)
+      centerCameraOnFlight(departure, arrival, distance)
 
       // Stop auto-rotation when flight is calculated
       setAutoRotate(false)
