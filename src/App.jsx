@@ -10,7 +10,8 @@ function App() {
   const canvasRef = useRef(null)
   const autoRotateRef = useRef(true)
   const cameraRef = useRef(null)
-  const controlsRef = useRef(null)  
+  const controlsRef = useRef(null) 
+  const [isLoading, setIsLoading] = useState(true) 
   const [currentTime, setCurrentTime] = useState(new Date())
   const [simulatedTime, setSimulatedTime] = useState(new Date())
   const [departureTime, setDepartureTime] = useState(new Date())
@@ -29,7 +30,7 @@ function App() {
   const [autoRotate, setAutoRotate] = useState(true)
   const [showPlaneIcon, setShowPlaneIcon] = useState(true)
   const [showFIR, setShowFIR] = useState(false)
-  const [showClouds, setShowClouds] = useState(true)
+  const [showClouds, setShowClouds] = useState(false)
   const [departureSearch, setDepartureSearch] = useState('')
   const [departureResults, setDepartureResults] = useState([])
   const [showDepartureSuggestions, setShowDepartureSuggestions] = useState(false)
@@ -49,11 +50,23 @@ function App() {
   const progressTubeRef = useRef(null)
   const planeIconRef = useRef(null)
   const showPlaneIconRef = useRef(true)
-  const showCloudsRef = useRef(true)
+  const showCloudsRef = useRef(false)
   const cloudLayerRef = useRef(null)
 
   useEffect(() => {
     if (!canvasRef.current) return
+
+      // Track texture loading
+      let texturesLoaded = 0
+      const totalTextures = 3
+      
+      const checkAllLoaded = () => {
+        texturesLoaded++
+        console.log(`Loaded ${texturesLoaded}/${totalTextures} textures`)
+        if (texturesLoaded >= totalTextures) {
+          setTimeout(() => setIsLoading(false), 300)
+        }
+      }
 
     // Load airport data from OpenFlights
     fetch('https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat')
@@ -124,10 +137,12 @@ function App() {
     const geometry = new THREE.SphereGeometry(2, 64, 64)
 
     // Load simplified Earth texture
-    const textureLoader = new THREE.TextureLoader()
-    const earthTexture = textureLoader.load(
-      '/earth-texture.png',  // Your custom texture
-      () => console.log('Earth texture loaded'),
+    const earthTexture = new THREE.TextureLoader().load(
+      '/earth-texture.png',
+      () => {
+        console.log('Earth texture loaded')
+        checkAllLoaded()
+      },
       undefined,
       (error) => console.error('Error loading texture:', error)
     )
@@ -144,8 +159,11 @@ function App() {
     // Add cloud layer
     const cloudGeometry = new THREE.SphereGeometry(2.01, 64, 64)
     const cloudTexture = new THREE.TextureLoader().load(
-      '/clouds-alpha.png',  // or '/clouds.jpg' depending on format
-      () => console.log('Cloud texture loaded'),
+      '/clouds-alpha.png',
+      () => {
+        console.log('Cloud texture loaded')
+        checkAllLoaded()
+      },
       undefined,
       (error) => console.error('Error loading clouds:', error)
     )
@@ -163,7 +181,7 @@ function App() {
     cloudLayerRef.current = cloudLayer
 
     // Load plane icon
-    const planeTexture = new THREE.TextureLoader().load('/plane-icon.svg')
+    const planeTexture = new THREE.TextureLoader().load('/plane-icon.svg', checkAllLoaded)
 
     // Create a plane mesh instead of sprite
     const planeGeometry = new THREE.PlaneGeometry(0.04, 0.04)
@@ -1493,7 +1511,7 @@ function App() {
     }
 
     return (
-      <div className="app">
+      <div className={`app ${isLoading ? 'loading' : 'loaded'}`}>
         <div className="info-overlay">
           <div className="time">{simulatedTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
           <div className="date">{simulatedTime.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</div>
@@ -1780,7 +1798,7 @@ function App() {
           </div>
         </div>
         
-        <canvas ref={canvasRef} />
+        <canvas ref={canvasRef} />      
     
         {flightResults && (
           <div className={`animation-controls ${flightPath ? 'visible' : ''}`}>

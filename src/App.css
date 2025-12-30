@@ -7,6 +7,15 @@
   position: relative;
 }
 
+.app.loading {
+  opacity: 0;
+}
+
+.app.loaded {
+  opacity: 1;
+  transition: opacity 1s ease-in;
+}
+
 .autocomplete-container {
   position: relative;
   width: 100%;
