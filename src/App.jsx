@@ -5,6 +5,7 @@ import SunCalc from 'suncalc'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import tzlookup from 'tz-lookup'
 import { DateTime } from 'luxon'
+import packageJson from '../package.json'
 
 function App() {
   const canvasRef = useRef(null)
@@ -529,32 +530,39 @@ function App() {
               // 105+: Night (deep blue)
               
               let r, g, b
-              
+
               if (sunAngle < 85) {
-                // Full daylight - gold
-                r = 1
-                g = 0.84
-                b = 0
+                // Full daylight - bright gold
+                r = 1.0
+                g = 0.85
+                b = 0.0
+              } else if (sunAngle < 90) {
+                // Civil twilight - gold to orange (5°)
+                const t = (sunAngle - 85) / 5
+                r = 1.0
+                g = 0.85 - t * 0.35
+                b = 0.0 + t * 0.15
               } else if (sunAngle < 95) {
-                // Twilight transition - gold to orange to light blue
-                const t = (sunAngle - 85) / 10
-                r = 1 - t * 0.4  // 1.0 -> 0.6
-                g = 0.84 - t * 0.2  // 0.84 -> 0.64
-                b = t * 0.8  // 0 -> 0.8
-              } else if (sunAngle < 105) {
-                // Deep twilight - light blue to blue
-                const t = (sunAngle - 95) / 10
-                r = 0.6 - t * 0.21  // 0.6 -> 0.39
-                g = 0.64 - t * 0.06  // 0.64 -> 0.58
-                b = 0.8 + t * 0.13  // 0.8 -> 0.93
+                // Nautical twilight - orange to purple (5°)
+                const t = (sunAngle - 90) / 5
+                r = 1.0 - t * 0.4
+                g = 0.5 - t * 0.3
+                b = 0.15 + t * 0.55
+              } else if (sunAngle < 100) {
+                // Deep twilight - purple to navy (5°)
+                const t = (sunAngle - 95) / 5
+                r = 0.6 - t * 0.5   // 0.6 → 0.1 (match night red)
+                g = 0.2 - t * 0.05  // 0.2 → 0.15 (match night green)
+                b = 0.7 - t * 0.2   // 0.7 → 0.5 (match night blue)
               } else {
-                // Night - cornflower blue
-                r = 0.39
-                g = 0.58
-                b = 0.93
+                // Night - navy blue
+                r = 0.1
+                g = 0.15
+                b = 0.5
               }
-              
+
               colors.push(r, g, b)
+
             }
             
             // Create single tube with vertex colors
@@ -1581,6 +1589,10 @@ function App() {
             />
             <span>Show clouds</span>
           </label>
+        </div>
+
+        <div className="version-info">
+          <div className="version-number">v{packageJson.version}</div>
         </div>
         
         <div className={`flight-input ${isPanelCollapsed ? 'collapsed' : ''}`}>

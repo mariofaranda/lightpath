@@ -95,7 +95,7 @@ canvas {
 
 .clouds-toggle-overlay {
   position: absolute;
-  bottom: 110px;
+  bottom: 150px;
   left: 20px;
   pointer-events: all;
 }
@@ -117,7 +117,7 @@ canvas {
 
 .airport-toggle-overlay {
   position: absolute;
-  bottom: 20px;
+  bottom: 60px;
   left: 20px;
   pointer-events: all;
 }
@@ -139,7 +139,7 @@ canvas {
 
 .graticule-toggle-overlay {
   position: absolute;
-  bottom: 50px;
+  bottom: 90px;
   left: 20px;
   pointer-events: all;
 }
@@ -535,7 +535,7 @@ canvas {
 
 .plane-toggle-overlay {
   position: absolute;
-  bottom: 80px;
+  bottom: 120px;
   left: 20px;
   pointer-events: all;
 }
@@ -557,7 +557,7 @@ canvas {
 
 .fir-toggle-overlay {
   position: absolute;
-  bottom: 140px;
+  bottom: 180px;
   left: 20px;
   pointer-events: all;
 }
@@ -575,4 +575,17 @@ canvas {
   cursor: pointer;
   width: 16px;
   height: 16px;
+}
+
+.version-info {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  pointer-events: none;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.version-number {
+  font-weight: 600;
 }
