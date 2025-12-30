@@ -31,7 +31,7 @@ function App() {
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false)
   const [autoRotate, setAutoRotate] = useState(true)
   const [showPlaneIcon, setShowPlaneIcon] = useState(true)
-  const [showFIR, setShowFIR] = useState(false)
+  const [showTimezones, setShowTimezones] = useState(false)
   const [showClouds, setShowClouds] = useState(false)
   const [departureSearch, setDepartureSearch] = useState('')
   const [departureResults, setDepartureResults] = useState([])
@@ -1135,28 +1135,28 @@ function App() {
       }
     }, [showGraticule])
 
-    // Effect to show/hide FIR boundaries
+    // Effect to show/hide timezone boundaries
     useEffect(() => {
       if (!sceneRef.current) return
       
       let fadeInterval = null
       
-      // Remove existing FIR if exists
-      const existingFIR = sceneRef.current.getObjectByName('fir-boundaries')
-      if (existingFIR) {
-        let opacity = 0.5
+      // Remove existing timezones if exists
+      const existingTimezones = sceneRef.current.getObjectByName('timezone-boundaries')
+      if (existingTimezones) {
+        let opacity = 0.3
         
         const fadeOut = setInterval(() => {
           opacity -= 0.02
           if (opacity <= 0) {
             clearInterval(fadeOut)
-            sceneRef.current.remove(existingFIR)
-            existingFIR.traverse((child) => {
+            sceneRef.current.remove(existingTimezones)
+            existingTimezones.traverse((child) => {
               if (child.geometry) child.geometry.dispose()
               if (child.material) child.material.dispose()
             })
           } else {
-            existingFIR.traverse((child) => {
+            existingTimezones.traverse((child) => {
               if (child.material) {
                 child.material.opacity = opacity
               }
@@ -1165,14 +1165,14 @@ function App() {
         }, 20)
       }
       
-      if (!showFIR) return
+      if (!showTimezones) return
       
-      // Load and render FIR boundaries
-      fetch('/fir-boundaries.geojson')
+      // Load and render timezone boundaries
+      fetch('/timezones.geojson')
         .then(res => res.json())
         .then(data => {
-          const firGroup = new THREE.Group()
-          firGroup.name = 'fir-boundaries'
+          const timezoneGroup = new THREE.Group()
+          timezoneGroup.name = 'timezone-boundaries'
           
           // Convert lat/lon to 3D
           const latLonToVector3 = (lon, lat, radius) => {
@@ -1186,7 +1186,7 @@ function App() {
             )
           }
           
-          // Process each feature (FIR boundary)
+          // Process each feature (timezone boundary)
           data.features.forEach(feature => {
             if (feature.geometry.type === 'Polygon') {
               feature.geometry.coordinates.forEach(ring => {
@@ -1196,13 +1196,13 @@ function App() {
                 
                 const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
                 const lineMaterial = new THREE.LineBasicMaterial({
-                  color: 0xff9900,  // Orange for FIR boundaries
+                  color: 0xffffff,  // White for timezone boundaries
                   transparent: true,
                   opacity: 0
                 })
                 
                 const line = new THREE.Line(lineGeometry, lineMaterial)
-                firGroup.add(line)
+                timezoneGroup.add(line)
               })
             } else if (feature.geometry.type === 'MultiPolygon') {
               feature.geometry.coordinates.forEach(polygon => {
@@ -1213,43 +1213,43 @@ function App() {
                   
                   const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
                   const lineMaterial = new THREE.LineBasicMaterial({
-                    color: 0xff9900,
+                    color: 0xffffff,
                     transparent: true,
                     opacity: 0
                   })
                   
                   const line = new THREE.Line(lineGeometry, lineMaterial)
-                  firGroup.add(line)
+                  timezoneGroup.add(line)
                 })
               })
             }
           })
           
-          sceneRef.current.add(firGroup)
+          sceneRef.current.add(timezoneGroup)
           
           // Fade in
           let opacity = 0
           fadeInterval = setInterval(() => {
             opacity += 0.02
-            if (opacity >= 0.5) {
-              opacity = 0.5
+            if (opacity >= 0.3) {  // Subtle white lines
+              opacity = 0.3
               clearInterval(fadeInterval)
             }
-            firGroup.traverse((child) => {
+            timezoneGroup.traverse((child) => {
               if (child.material) {
                 child.material.opacity = opacity
               }
             })
           }, 20)
           
-          console.log('FIR boundaries loaded with', data.features.length, 'regions')
+          console.log('Timezone boundaries loaded with', data.features.length, 'zones')
         })
-        .catch(err => console.error('Error loading FIR boundaries:', err))
+        .catch(err => console.error('Error loading timezone boundaries:', err))
       
       return () => {
         if (fadeInterval) clearInterval(fadeInterval)
       }
-    }, [showFIR])
+    }, [showTimezones])
 
     useEffect(() => {
       if (!isPlaying || !flightDataRef.current) return
@@ -1296,11 +1296,33 @@ function App() {
           setIsPlaying(!isPlaying)
         }
 
-          // P for plane toggle
+        // A for airports toggle
+        if (e.key === 'a' || e.key === 'A') {
+          setShowAirports(!showAirports)
+        }
+
+        // P for plane toggle
         if (e.key === 'p' || e.key === 'P') {
           setShowPlaneIcon(!showPlaneIcon)
           showPlaneIconRef.current = !showPlaneIcon
         }
+
+        // T for timezones toggle
+        if (e.key === 't' || e.key === 'T') {
+          setShowTimezones(!showTimezones)
+        }
+
+        // G for graticule toggle
+        if (e.key === 'g' || e.key === 'G') {
+          setShowGraticule(!showGraticule)
+        }
+
+        // C for clouds toggle
+        if (e.key === 'c' || e.key === 'C') {
+          setShowClouds(!showClouds)
+          showCloudsRef.current = !showClouds
+        }
+
       }
       
       window.addEventListener('keydown', handleKeyPress)
@@ -1308,7 +1330,8 @@ function App() {
       return () => {
         window.removeEventListener('keydown', handleKeyPress)
       }
-    }, [isPlaying, flightResults, animationProgress, showPlaneIcon])
+
+    }, [isPlaying, flightResults, animationProgress, showAirports, showPlaneIcon, showTimezones, showGraticule, showClouds])
 
     const isPointInDaylight = (lat, lon, time) => {
       // Get subsolar point at this time
@@ -1649,7 +1672,7 @@ function App() {
               checked={showAirports}
               onChange={(e) => setShowAirports(e.target.checked)}
             />
-            <span>Show all airports</span>
+            <span>(A) Show Airports</span>
           </label>
         </div>
 
@@ -1660,7 +1683,7 @@ function App() {
               checked={showGraticule}
               onChange={(e) => setShowGraticule(e.target.checked)}
             />
-            <span>Show graticule</span>
+            <span>(G) Show Graticule</span>
           </label>
         </div>
 
@@ -1674,18 +1697,18 @@ function App() {
                 showPlaneIconRef.current = e.target.checked
               }}
             />
-            <span>Show plane icon</span>
+            <span>(P) Show Airplane</span>
           </label>
         </div>
 
-        <div className="fir-toggle-overlay">
+        <div className="timezone-toggle-overlay">
           <label>
             <input 
               type="checkbox"
-              checked={showFIR}
-              onChange={(e) => setShowFIR(e.target.checked)}
+              checked={showTimezones}
+              onChange={(e) => setShowTimezones(e.target.checked)}
             />
-            <span>Show FIR boundaries</span>
+            <span>(T) Show Timezones</span>
           </label>
         </div>
 
@@ -1699,7 +1722,7 @@ function App() {
                 showCloudsRef.current = e.target.checked
               }}
             />
-            <span>Show clouds</span>
+            <span>(C) Show Clouds</span>
           </label>
         </div>
         

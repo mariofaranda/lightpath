@@ -569,14 +569,14 @@ canvas {
   accent-color: #2d2e2f;
 }
 
-.fir-toggle-overlay {
+.timezone-toggle-overlay {
   position: absolute;
   bottom: 180px;
   left: 20px;
   pointer-events: all;
 }
 
-.fir-toggle-overlay label {
+.timezone-toggle-overlay label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -585,7 +585,7 @@ canvas {
   color: rgba(255, 255, 255, 0.7);
 }
 
-.fir-toggle-overlay input[type="checkbox"] {
+.timezone-toggle-overlay input[type="checkbox"] {
   cursor: pointer;
   width: 16px;
   height: 16px;
