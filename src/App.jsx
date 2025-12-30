@@ -28,6 +28,7 @@ function App() {
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false)
   const [autoRotate, setAutoRotate] = useState(true)
   const [showPlaneIcon, setShowPlaneIcon] = useState(true)
+  const [showClouds, setShowClouds] = useState(true)
   
   // Store scene reference to add/remove flight path
   const sceneRef = useRef(null)
@@ -38,6 +39,8 @@ function App() {
   const progressTubeRef = useRef(null)
   const planeIconRef = useRef(null)
   const showPlaneIconRef = useRef(true)
+  const showCloudsRef = useRef(true)
+  const cloudLayerRef = useRef(null)
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -127,6 +130,27 @@ function App() {
 
     const sphere = new THREE.Mesh(geometry, material)
     scene.add(sphere)
+
+    // Add cloud layer
+    const cloudGeometry = new THREE.SphereGeometry(2.01, 64, 64)
+    const cloudTexture = new THREE.TextureLoader().load(
+      '/clouds-alpha.png',  // or '/clouds.jpg' depending on format
+      () => console.log('Cloud texture loaded'),
+      undefined,
+      (error) => console.error('Error loading clouds:', error)
+    )
+
+    const cloudMaterial = new THREE.MeshBasicMaterial({
+      map: cloudTexture,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false,
+      color: 0xffffff  // White tint - brightens the texture
+    })
+    
+    const cloudLayer = new THREE.Mesh(cloudGeometry, cloudMaterial)
+    scene.add(cloudLayer)
+    cloudLayerRef.current = cloudLayer
 
     // Load plane icon
     const planeTexture = new THREE.TextureLoader().load('/plane-icon.svg')
@@ -572,6 +596,11 @@ function App() {
         } else {
           if (planeIconRef.current) planeIconRef.current.visible = false
         }
+      }
+
+      // Update cloud visibility
+      if (cloudLayerRef.current) {
+        cloudLayerRef.current.visible = showCloudsRef.current
       }
 
       // Keep location dot constant size
@@ -1358,6 +1387,20 @@ function App() {
               }}
             />
             <span>Show plane icon</span>
+          </label>
+        </div>
+
+        <div className="clouds-toggle-overlay">
+          <label>
+            <input 
+              type="checkbox"
+              checked={showClouds}
+              onChange={(e) => {
+                setShowClouds(e.target.checked)
+                showCloudsRef.current = e.target.checked
+              }}
+            />
+            <span>Show clouds</span>
           </label>
         </div>
         
