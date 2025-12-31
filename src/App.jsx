@@ -1304,6 +1304,12 @@ function App() {
     // Keyboard controls for animation
     useEffect(() => {
       const handleKeyPress = (e) => {
+
+          // Ignore keyboard shortcuts when typing in input fields
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          return
+        }
+        
         // Only respond to spacebar when there's a flight
         if (e.code === 'Space' && flightResults) {
           e.preventDefault() // Prevent page scroll
