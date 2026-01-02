@@ -2013,79 +2013,102 @@ function App() {
       }
     }, [isBWMode])
 
-    // Update scene background when B&W mode changes
+// Update scene background when B&W mode changes
     useEffect(() => {
       if (!sceneRef.current) return
       
-      if (isBWMode) {
-        sceneRef.current.background = new THREE.Color(0xf5f5f5)
-
-        // Plane icon
-        if (planeIconRef.current && planeBWTextureRef.current) {
-          planeIconRef.current.material.map = planeBWTextureRef.current
-          planeIconRef.current.material.needsUpdate = true
-        }
-        
-        // Disable twilight overlay
-        if (twilightSphereRef.current) {
-          twilightSphereRef.current.material.uniforms.overlayIntensity.value = 0.55
-        }
-        
-        // Boost ambient light for even illumination
-        if (ambientLightRef.current) {
-          ambientLightRef.current.intensity = 1.8
-        }
-
-        // Darker glow
-        if (glowRef.current) {
-          glowRef.current.material.uniforms.glowColor.value.set(0.5, 0.5, 0.5)  // Dark grey
-          glowRef.current.material.blending = THREE.NormalBlending
-        }
-
-        // Update graticule color
-        const graticule = sceneRef.current.getObjectByName('graticule')
-        if (graticule) {
-          graticule.traverse((child) => {
-            if (child.material) {
-              child.material.color.setHex(0x0f0f0f)
-            }
-          })
-        }
-                
-      } else {
-        sceneRef.current.background = new THREE.Color(0x606569)
-
-        if (planeIconRef.current && planeTextureRef.current) {
-          planeIconRef.current.material.map = planeTextureRef.current
-          planeIconRef.current.material.needsUpdate = true
-        }
-                
-        // Restore twilight overlay
-        if (twilightSphereRef.current) {
-          twilightSphereRef.current.material.uniforms.overlayIntensity.value = 0.65
-        }
-        
-        // Restore ambient light
-        if (ambientLightRef.current) {
-          ambientLightRef.current.intensity = 0.3
-        }
-
-        if (glowRef.current) {
-          glowRef.current.material.uniforms.glowColor.value.set(1.0, 1.0, 1.0)  // White
-          glowRef.current.material.blending = THREE.AdditiveBlending
-        }
-
-        // Update graticule color
-        const graticule = sceneRef.current.getObjectByName('graticule')
-        if (graticule) {
-          graticule.traverse((child) => {
-            if (child.material) {
-              child.material.color.setHex(0xffffff)
-            }
-          })
-        }
-
+      // Target values for each mode
+      const targets = isBWMode ? {
+        bgColor: new THREE.Color(0xf5f5f5),
+        ambientIntensity: 1.8,
+        overlayIntensity: 0.55,
+        graticuleColor: 0x0f0f0f
+      } : {
+        bgColor: new THREE.Color(0x606569),
+        ambientIntensity: 0.3,
+        overlayIntensity: 0.65,
+        graticuleColor: 0xffffff
       }
+      
+      // Capture starting values
+      const startBg = sceneRef.current.background.clone()
+      const startAmbient = ambientLightRef.current?.intensity || 0.3
+      const startOverlay = twilightSphereRef.current?.material.uniforms.overlayIntensity.value || 0.65
+      
+      // Animate the transition
+      const duration = 300 // milliseconds
+      const startTime = Date.now()
+      
+      const animateTransition = () => {
+        const elapsed = Date.now() - startTime
+        const t = Math.min(elapsed / duration, 1)
+        const easeT = t * (2 - t) // Ease out
+        
+        // Interpolate background color
+        sceneRef.current.background.lerpColors(startBg, targets.bgColor, easeT)
+        
+        // Interpolate ambient light
+        if (ambientLightRef.current) {
+          ambientLightRef.current.intensity = startAmbient + (targets.ambientIntensity - startAmbient) * easeT
+        }
+        
+        // Interpolate overlay intensity
+        if (twilightSphereRef.current) {
+          twilightSphereRef.current.material.uniforms.overlayIntensity.value = 
+            startOverlay + (targets.overlayIntensity - startOverlay) * easeT
+        }
+
+        // Interpolate glow
+        if (glowRef.current) {
+          const startGlowColor = isBWMode ? new THREE.Vector3(1.5, 1.5, 1.5) : new THREE.Vector3(0.5, 0.5, 0.5)
+          const endGlowColor = isBWMode ? new THREE.Vector3(0.5, 0.5, 0.5) : new THREE.Vector3(1.0, 1.0, 1.0)
+          
+          glowRef.current.material.uniforms.glowColor.value.set(
+            startGlowColor.x + (endGlowColor.x - startGlowColor.x) * easeT,
+            startGlowColor.y + (endGlowColor.y - startGlowColor.y) * easeT,
+            startGlowColor.z + (endGlowColor.z - startGlowColor.z) * easeT
+          )
+          
+          // Switch blending mode at the midpoint
+          if (t >= 0.5) {
+            glowRef.current.material.blending = isBWMode ? THREE.NormalBlending : THREE.AdditiveBlending
+          }
+        }
+        
+        // Interpolate graticule color
+        const graticule = sceneRef.current.getObjectByName('graticule')
+        if (graticule) {
+          const startGraticuleColor = isBWMode ? new THREE.Color(0xffffff) : new THREE.Color(0x0f0f0f)
+          const endGraticuleColor = new THREE.Color(targets.graticuleColor)
+          const currentColor = new THREE.Color().lerpColors(startGraticuleColor, endGraticuleColor, easeT)
+          
+          graticule.traverse((child) => {
+            if (child.material) {
+              child.material.color.copy(currentColor)
+            }
+          })
+        }
+        
+        if (t < 1) {
+          requestAnimationFrame(animateTransition)
+        } else {
+          // At the end, set non-animatable values
+          
+          // Plane icon
+          if (planeIconRef.current) {
+            if (isBWMode && planeBWTextureRef.current) {
+              planeIconRef.current.material.map = planeBWTextureRef.current
+              planeIconRef.current.material.needsUpdate = true
+            } else if (!isBWMode && planeTextureRef.current) {
+              planeIconRef.current.material.map = planeTextureRef.current
+              planeIconRef.current.material.needsUpdate = true
+            }
+          }
+        }
+      }
+      
+      animateTransition()
+      
     }, [isBWMode])
 
     return (
