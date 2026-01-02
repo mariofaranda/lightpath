@@ -11,7 +11,7 @@
   --path-day-color: rgb(255, 255, 255);  /* White (daylight) */
   --path-twilight-warm: rgb(180, 180, 180);  /* Light gray */
   --path-twilight-cool: rgb(120, 120, 120);  /* Medium gray */
-  --path-night-color: rgb(40, 40, 40);  /* Dark (night) */
+  --path-night-color: rgb(0, 0, 0);  /* Dark (night) */
 }
 
 .bw-mode .nav-link,

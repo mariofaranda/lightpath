@@ -55,6 +55,8 @@ function App() {
   const hasFlightPathRef = useRef(false)
   const progressTubeRef = useRef(null)
   const planeIconRef = useRef(null)
+  const planeTextureRef = useRef(null)
+  const planeBWTextureRef = useRef(null)
   const showPlaneIconRef = useRef(true)
   const timezoneDataRef = useRef(null)
   const timezoneFadeIntervalRef = useRef(null)
@@ -63,6 +65,8 @@ function App() {
   const bwColorsRef = useRef(null)
   const twilightSphereRef = useRef(null)
   const earthMaterialRef = useRef(null)
+  const ambientLightRef = useRef(null)
+  const glowRef = useRef(null)
 
   // Helper to get RGB color from CSS variable
   const getCSSColor = (varName, element = document.documentElement) => {
@@ -186,6 +190,9 @@ function App() {
 
     // Load plane icon
     const planeTexture = new THREE.TextureLoader().load('/plane-icon.svg', checkAllLoaded)
+    const planeBWTexture = new THREE.TextureLoader().load('/plane-icon-bw.svg')
+    planeTextureRef.current = planeTexture
+    planeBWTextureRef.current = planeBWTexture
 
     // Create a plane mesh instead of sprite
     const planeGeometry = new THREE.PlaneGeometry(0.04, 0.04)
@@ -205,7 +212,9 @@ function App() {
     // Add atmospheric glow
     const glowGeometry = new THREE.SphereGeometry(2.05, 64, 64)
     const glowMaterial = new THREE.ShaderMaterial({
-      uniforms: {},
+      uniforms: {
+        glowColor: { value: new THREE.Vector3(1.0, 1.0, 1.0) }
+      },
       vertexShader: `
         varying vec3 vNormal;
         void main() {
@@ -214,10 +223,11 @@ function App() {
         }
       `,
       fragmentShader: `
+        uniform vec3 glowColor;
         varying vec3 vNormal;
         void main() {
           float intensity = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-          gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0) * intensity;
+          gl_FragColor = vec4(glowColor, 1.0) * intensity;
         }
       `,
       side: THREE.BackSide,
@@ -227,6 +237,7 @@ function App() {
     })
     const atmosphereGlow = new THREE.Mesh(glowGeometry, glowMaterial)
     scene.add(atmosphereGlow)
+    glowRef.current = atmosphereGlow
 
     // Add a marker at user location
     const dotGeometry = new THREE.SphereGeometry(0.01, 32, 32)
@@ -316,6 +327,7 @@ function App() {
     // Add ambient light (soft overall illumination)
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3)
     scene.add(ambientLight)
+    ambientLightRef.current = ambientLight
 
     // Add directional light positioned as the sun
     const sunLight = new THREE.DirectionalLight(0xffffff, 1.2)
@@ -326,7 +338,8 @@ function App() {
     const twilightGeometry = new THREE.SphereGeometry(2.003, 128, 128)
     const twilightMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        sunDirection: { value: sunDirection.clone().normalize() }
+        sunDirection: { value: sunDirection.clone().normalize() },
+        overlayIntensity: { value: 0.65 }
       },
       vertexShader: `
         varying vec3 vWorldNormal;
@@ -339,6 +352,7 @@ function App() {
       `,
       fragmentShader: `
         uniform vec3 sunDirection;
+        uniform float overlayIntensity;
         varying vec3 vWorldNormal;
         
         void main() {
@@ -370,7 +384,7 @@ function App() {
           }
           
           // Output black with calculated opacity
-          gl_FragColor = vec4(0.0, 0.0, 0.0, darkness * 0.65);
+          gl_FragColor = vec4(0.0, 0.0, 0.0, darkness * overlayIntensity);
         }
       `,
       transparent: true,
@@ -569,12 +583,18 @@ function App() {
                   r = dayColor.r
                   g = dayColor.g
                   b = dayColor.b
-                } else if (sunAngle < 95) {
-                  // Twilight - interpolate white to gray
-                  const t = (sunAngle - 85) / 10
+                } else if (sunAngle < 90) {
+                  // Early twilight - day to twilight
+                  const t = (sunAngle - 85) / 5
                   r = dayColor.r * (1 - t) + twilightColor.r * t
                   g = dayColor.g * (1 - t) + twilightColor.g * t
                   b = dayColor.b * (1 - t) + twilightColor.b * t
+                } else if (sunAngle < 100) {
+                  // Late twilight - twilight to night
+                  const t = (sunAngle - 90) / 10
+                  r = twilightColor.r * (1 - t) + nightColor.r * t
+                  g = twilightColor.g * (1 - t) + nightColor.g * t
+                  b = twilightColor.b * (1 - t) + nightColor.b * t
                 } else {
                   // Night - dark
                   r = nightColor.r
@@ -707,7 +727,7 @@ function App() {
               canvas.width = 200
               canvas.height = 100
               
-              context.fillStyle = 'rgba(255, 255, 255, 0.9)'
+              context.fillStyle = isBWModeRef.current ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)'
               context.font = '40px system-ui'  // Just change this for size
               context.textAlign = 'center'
               context.textBaseline = 'middle'
@@ -1046,7 +1066,7 @@ function App() {
       flightGroup.add(arrivalDot)
 
       // Add text labels using canvas textures
-      const createTextLabel = (text, iconSrc) => {
+      const createTextLabel = (text, iconSrc, isBW = false) => {
         return new Promise((resolve) => {
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
@@ -1058,7 +1078,7 @@ function App() {
           icon.onload = () => {
             // Draw rounded rectangle background
             const radius = 64  // Changed to 72 will be too round for this size, try 50
-            context.fillStyle = '#0c0c0cff'
+            context.fillStyle = isBW ? '#f0f0f0' : '#0c0c0c'
             context.beginPath()
             context.moveTo(radius, 0)
             context.lineTo(canvas.width - radius, 0)
@@ -1087,7 +1107,7 @@ function App() {
             context.drawImage(icon, startX, iconY, iconSize, iconSize)
             
             // Draw text
-            context.fillStyle = '#ffffff'
+            context.fillStyle = isBW ? '#1a1a1a' : '#ffffff'
             context.textAlign = 'left'
             context.textBaseline = 'middle'
             context.fillText(text, startX + iconSize + gap, canvas.height / 2)
@@ -1109,7 +1129,7 @@ function App() {
 
       // Create labels with offset
       const createLabelWithOffset = async (code, lat, lon, iconSrc) => {
-        const label = await createTextLabel(code, iconSrc)
+        const label = await createTextLabel(code, iconSrc, isBWModeRef.current)
         const basePos = latLonToVector3(lat, lon, 2.05)
         const offsetLat = lat - 0.5
         const offsetPos = latLonToVector3(offsetLat, lon, 2.05)
@@ -1118,11 +1138,17 @@ function App() {
         return label
       }
 
-      const createLabels = async () => {
-        const departureLabel = await createLabelWithOffset(departureCode, departure.lat, departure.lon, '/departure-icon.svg')
+        const createLabels = async () => {
+          // Delay to ensure isBWMode state is current after toggle
+          // (prevents race condition with useEffect execution order)
+          await new Promise(resolve => setTimeout(resolve, 0))
+          
+          const depIcon = isBWMode ? '/departure-icon-bw.svg' : '/departure-icon.svg'
+          const arrIcon = isBWMode ? '/arrival-icon-bw.svg' : '/arrival-icon.svg'
+                
+        const departureLabel = await createLabelWithOffset(departureCode, departure.lat, departure.lon, depIcon)
         flightGroup.add(departureLabel)
-        
-        const arrivalLabel = await createLabelWithOffset(arrivalCode, arrival.lat, arrival.lon, '/arrival-icon.svg')
+        const arrivalLabel = await createLabelWithOffset(arrivalCode, arrival.lat, arrival.lon, arrIcon)
         flightGroup.add(arrivalLabel)
         
         sceneRef.current.add(flightGroup)
@@ -1133,7 +1159,7 @@ function App() {
 
       createLabels()
 
-      }, [flightPath, flightResults, departureTime, departureCode, arrivalCode])
+      }, [flightPath, flightResults, departureTime, departureCode, arrivalCode, isBWMode])
 
     // Effect to show/hide all airports
     useEffect(() => {
@@ -1959,37 +1985,6 @@ function App() {
       return dt.toFormat('MMM d').toUpperCase()
     }
 
-    // Update scene background when B&W mode changes
-    useEffect(() => {
-      if (!sceneRef.current) return
-      
-      if (isBWMode) {
-        sceneRef.current.background = new THREE.Color(0xf5f5f5)
-        
-        // Lighten twilight overlay
-        if (twilightSphereRef.current) {
-          twilightSphereRef.current.material.opacity = 0.1
-        }
-        
-        // Lighten Earth
-        if (earthMaterialRef.current) {
-          earthMaterialRef.current.color.setHex(0xf0f0f0)
-        }
-      } else {
-        sceneRef.current.background = new THREE.Color(0x606569)
-        
-        // Restore twilight overlay
-        if (twilightSphereRef.current) {
-          twilightSphereRef.current.material.opacity = 0.65
-        }
-        
-        // Restore Earth color
-        if (earthMaterialRef.current) {
-          earthMaterialRef.current.color.setHex(0xffffff)
-        }
-      }
-    }, [isBWMode])
-
     // Sync isBWMode state to ref and update colors
     useEffect(() => {
       isBWModeRef.current = isBWMode
@@ -2004,6 +1999,61 @@ function App() {
             night: getCSSColor('--path-night-color', appElement)
           }
         }
+      }
+    }, [isBWMode])
+
+    // Update scene background when B&W mode changes
+    useEffect(() => {
+      if (!sceneRef.current) return
+      
+      if (isBWMode) {
+        sceneRef.current.background = new THREE.Color(0xf5f5f5)
+
+        // Plane icon
+        if (planeIconRef.current && planeBWTextureRef.current) {
+          planeIconRef.current.material.map = planeBWTextureRef.current
+          planeIconRef.current.material.needsUpdate = true
+        }
+        
+        // Disable twilight overlay
+        if (twilightSphereRef.current) {
+          twilightSphereRef.current.material.uniforms.overlayIntensity.value = 0.65
+        }
+        
+        // Boost ambient light for even illumination
+        if (ambientLightRef.current) {
+          ambientLightRef.current.intensity = 2
+        }
+
+        // Darker glow
+        if (glowRef.current) {
+          glowRef.current.material.uniforms.glowColor.value.set(0.5, 0.5, 0.5)  // Dark grey
+          glowRef.current.material.blending = THREE.NormalBlending
+        }
+                
+      } else {
+        sceneRef.current.background = new THREE.Color(0x606569)
+
+        if (planeIconRef.current && planeTextureRef.current) {
+          planeIconRef.current.material.map = planeTextureRef.current
+          planeIconRef.current.material.needsUpdate = true
+        }
+                
+        // Restore twilight overlay
+        if (twilightSphereRef.current) {
+          twilightSphereRef.current.material.uniforms.overlayIntensity.value = 0.65
+        }
+        
+        // Restore ambient light
+        if (ambientLightRef.current) {
+          ambientLightRef.current.intensity = 0.3
+        }
+
+        if (glowRef.current) {
+          glowRef.current.material.uniforms.glowColor.value.set(1.0, 1.0, 1.0)  // White
+          glowRef.current.material.blending = THREE.AdditiveBlending
+        }
+
       }
     }, [isBWMode])
 
