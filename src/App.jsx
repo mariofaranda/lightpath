@@ -374,6 +374,7 @@ function App() {
     const twilightMaterial = new THREE.ShaderMaterial({
       uniforms: {
         sunDirection: { value: sunDirection.clone().normalize() },
+        sunDeclination: { value: 0.0 },
         overlayIntensity: { value: 0.65 }
       },
       vertexShader: `
@@ -387,6 +388,7 @@ function App() {
       `,
       fragmentShader: `
         uniform vec3 sunDirection;
+        uniform float sunDeclination;
         uniform float overlayIntensity;
         varying vec3 vWorldNormal;
         
@@ -395,15 +397,47 @@ function App() {
           vec3 normal = normalize(vWorldNormal);
           float sunAngle = dot(normal, sunDirection);
           
-          // Convert to degrees (approximately)
+          // Convert to degrees
           float angleDeg = acos(clamp(sunAngle, -1.0, 1.0)) * 180.0 / 3.14159;
           
-          // Define transition range
-          float transitionStart = 82.0;
-          float transitionEnd = 98.0;
-
+          // Calculate latitude from the world normal
+          float latitude = asin(clamp(normal.y, -1.0, 1.0)) * 180.0 / 3.14159;
+          float absLatitude = abs(latitude);
+          
+          // Calculate twilight width based on latitude AND solar declination
+          // The sun's path relative to horizon depends on both observer latitude and sun's declination
+          
+          // Base twilight width (astronomical: sun from 0° to 18° below horizon)
+          float baseTwilightAngle = 18.0;
+          
+          // Calculate the angular speed of sunset/sunrise
+          // This depends on the angle between the sun's path and the horizon
+          // At equator during equinox: sun drops perpendicular (fast)
+          // At poles or when sun path is oblique: sun drops at shallow angle (slow)
+          
+          // Latitude effect: higher latitude = more oblique sun path
+          float latitudeFactor = cos(absLatitude * 3.14159 / 180.0);
+          
+          // Declination effect: when sun declination differs from latitude, path is more oblique
+          float declinationDiff = abs(latitude - sunDeclination);
+          float declinationFactor = 1.0 + (declinationDiff / 90.0) * 0.5;
+          
+          // Reduce latitude effect by using a smaller multiplier
+          float latitudeEffect = mix(1.0, 1.4, 1.0 - latitudeFactor);
+          float obliquityFactor = latitudeEffect * declinationFactor;
+          
+          // Calculate effective twilight width with reduced base angle
+          float twilightWidth = (baseTwilightAngle * 0.7) * obliquityFactor;
+          
+          // Clamp to tighter, more reasonable values
+          twilightWidth = clamp(twilightWidth, 12.0, 28.0);
+          
+          // Apply the twilight zone centered at 90°
+          float transitionStart = 90.0 - twilightWidth * 0.5;
+          float transitionEnd = 90.0 + twilightWidth * 0.5;
+          
           float darkness = 0.0;
-
+          
           if (angleDeg >= transitionEnd) {
             // Full night
             darkness = 1.0;
@@ -413,13 +447,17 @@ function App() {
           } else {
             // Smooth transition from day to night
             float t = (angleDeg - transitionStart) / (transitionEnd - transitionStart);
-            // Use smooth interpolation
             darkness = smoothstep(0.0, 1.0, t);
-            darkness = pow(darkness, 1.5); // Adjust curve for more natural falloff
+            darkness = pow(darkness, 1.5);
           }
           
-          // Output black with calculated opacity
-          gl_FragColor = vec4(0.0, 0.0, 0.0, darkness * overlayIntensity);
+          // Add subtle dithering to reduce banding artifacts
+          float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+          dither = (dither - 0.5) * 0.01; // Very subtle noise
+
+          // Output black with calculated opacity and dithering
+          float finalDarkness = clamp(darkness * overlayIntensity + dither, 0.0, 1.0);
+          gl_FragColor = vec4(0.0, 0.0, 0.0, finalDarkness);
         }
       `,
       transparent: true,
@@ -473,6 +511,7 @@ function App() {
       
       // Update twilight shader
       sceneRefs.twilightMaterial.uniforms.sunDirection.value.copy(sunDirection.normalize())
+      sceneRefs.twilightMaterial.uniforms.sunDeclination.value = subsolarLatitude
     }
 
     function updateSunPositionForTime(time) {
@@ -501,6 +540,7 @@ function App() {
       
       // Update twilight shader
       sceneRefs.twilightMaterial.uniforms.sunDirection.value.copy(sunDirection.normalize())
+      sceneRefs.twilightMaterial.uniforms.sunDeclination.value = subsolarLatitude
     }
 
     // 5. Animation loop
