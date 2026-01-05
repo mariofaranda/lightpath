@@ -553,11 +553,12 @@ function App() {
               colors.push(r, g, b)
             }
 
-            // Update pre-created transition labels visibility and position
+            // Update pre-created transition labels and rings visibility and position
             const curve = flightLineRef.current.userData.routeCurve
             
             transitionLabelsRef.current.forEach(label => {
               const transitionT = label.userData.transitionT
+              const ring = label.userData.ring
               
               if (transitionT <= progress) {
                 // Show label and position it
@@ -569,10 +570,26 @@ function App() {
                 // Fade in over 2% of progress after appearing
                 const fadeProgress = (progress - transitionT) / 0.02
                 label.material.opacity = Math.min(fadeProgress, 1)
+                
+                // Show and position ring perpendicular to path
+                if (ring) {
+                  ring.visible = true
+                  ring.position.copy(point)
+                  
+                  // Orient ring so it wraps around the path
+                  const tangent = curve.getTangent(transitionT).normalize()
+                  ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent)
+                  
+                  ring.material.opacity = Math.min(fadeProgress, 1)
+                }
               } else {
-                // Hide label (not reached yet)
+                // Hide label and ring (not reached yet)
                 label.visible = false
                 label.material.opacity = 0
+                if (ring) {
+                  ring.visible = false
+                  ring.material.opacity = 0
+                }
               }
             })
 
@@ -1007,8 +1024,21 @@ function App() {
         flightGroup.userData.preCalculatedColorsBW = preCalculatedColorsBW
         flightGroup.userData.preCalculatedTransitions = preCalculatedTransitions
 
-        // Pre-create transition labels
+        // Pre-create transition labels and rings
         preCalculatedTransitions.forEach(trans => {
+          // Create the ring (torus) at transition point
+          const ringGeometry = new THREE.TorusGeometry(0.008, 0.002, 8, 32)
+          const ringMaterial = new THREE.MeshBasicMaterial({
+            color: isBWMode ? 0x1a1a1a : 0xffffff,
+            transparent: true,
+            opacity: 0
+          })
+          const ring = new THREE.Mesh(ringGeometry, ringMaterial)
+          ring.visible = false
+          ring.userData.transitionT = trans.t
+          flightGroup.add(ring)
+          
+          // Create the label
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
           canvas.width = 200
@@ -1028,16 +1058,16 @@ function App() {
           })
           const sprite = new THREE.Sprite(material)
           sprite.scale.set(0.1, 0.05, 1)
-          sprite.visible = false  // Hidden initially
+          sprite.visible = false
           
-          // Store the transition info on the sprite
           sprite.userData.transitionT = trans.t
           sprite.userData.transitionIndex = trans.index
           sprite.userData.timeText = trans.time
+          sprite.userData.ring = ring  // Link ring to label
           
           flightGroup.add(sprite)
           transitionLabelsRef.current.push(sprite)
-        })
+        })    
 
         // Store points for calculating label positions during animation
         flightGroup.userData.routePoints = points
@@ -2230,7 +2260,7 @@ function App() {
             arrivalLabelRef.current.material.needsUpdate = true
           }
           
-          // Update transition labels
+          // Update transition labels and rings
           transitionLabelsRef.current.forEach(label => {
             const timeText = label.userData.timeText
             if (timeText && label.material.map) {
@@ -2248,6 +2278,12 @@ function App() {
               label.material.map.dispose()
               label.material.map = new THREE.CanvasTexture(canvas)
               label.material.needsUpdate = true
+            }
+            
+            // Update ring color
+            const ring = label.userData.ring
+            if (ring) {
+              ring.material.color.setHex(isBWMode ? 0x1a1a1a : 0xffffff)
             }
           })
         }
