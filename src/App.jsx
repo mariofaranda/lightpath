@@ -697,9 +697,27 @@ function App() {
             // Use stored distance
             const targetDistance = camera.userData.followModeDistance
             
-            // Position camera directly above the plane at the stored distance
+            // Get plane's normal (pointing away from Earth)
             const planeNormal = position.clone().normalize()
-            const targetCameraPos = planeNormal.multiplyScalar(targetDistance)
+            
+            // Create a tilt: shift camera 10° toward south
+            // We'll rotate the view direction slightly
+            const tiltAngle = 10 * Math.PI / 180  // 10 degrees in radians
+            
+            // Calculate "south" direction (perpendicular to plane normal, toward negative latitude)
+            // Get a vector pointing "south" relative to the plane's position
+            const south = new THREE.Vector3(0, -1, 0)  // Start with down direction
+            const east = new THREE.Vector3().crossVectors(planeNormal, south).normalize()
+            const actualSouth = new THREE.Vector3().crossVectors(east, planeNormal).normalize()
+            
+            // Tilt the normal slightly toward south
+            const tiltedNormal = planeNormal.clone()
+              .multiplyScalar(Math.cos(tiltAngle))
+              .add(actualSouth.multiplyScalar(Math.sin(tiltAngle)))
+              .normalize()
+            
+            // Position camera at tilted angle
+            const targetCameraPos = tiltedNormal.multiplyScalar(targetDistance)
             
             // Smooth camera movement
             camera.position.lerp(targetCameraPos, 0.05)
