@@ -67,6 +67,8 @@ function App() {
   const earthMaterialRef = useRef(null)
   const ambientLightRef = useRef(null)
   const glowRef = useRef(null)
+  const departureLabelRef = useRef(null)
+  const arrivalLabelRef = useRef(null)
 
   // Helper to get RGB color from CSS variable
   const getCSSColor = (varName, element = document.documentElement) => {
@@ -528,8 +530,10 @@ function App() {
           
           if (completedPoints.length > 1) {
 
-            // Use pre-calculated colors with interpolation
-            const preCalculatedColors = flightLineRef.current.userData.preCalculatedColors
+            // Use pre-calculated colors with interpolation (pick correct set based on mode)
+            const preCalculatedColors = isBWModeRef.current 
+              ? flightLineRef.current.userData.preCalculatedColorsBW 
+              : flightLineRef.current.userData.preCalculatedColorsColor
             const colors = []
             
             for (let i = 0; i < completedPoints.length; i++) {
@@ -829,8 +833,9 @@ function App() {
         })
       }
 
-      // Pre-calculate colors for entire path
-        const preCalculatedColors = []
+// Pre-calculate colors for entire path - BOTH color and B&W versions
+        const preCalculatedColorsColor = []
+        const preCalculatedColorsBW = []
         const preCalculatedTransitions = []
         let lastWasDaylight = segmentData[0].sunAngle < 95
 
@@ -847,96 +852,93 @@ function App() {
           
           let r, g, b
 
-          // In B&W mode, use simpler gradient
-          if (isBWMode) {
-            const dayColor = bwColorsRef.current?.day || { r: 1, g: 1, b: 1 }
-            const nightColor = bwColorsRef.current?.night || { r: 0, g: 0, b: 0 }
-            
-            if (sunAngle < 85) {
-              // Full day - white
-              r = dayColor.r
-              g = dayColor.g
-              b = dayColor.b
-            } else if (sunAngle < 100) {
-              // Twilight zone (85-100°) - smooth gradient from white to black
-              const t = (sunAngle - 85) / 15  // 0 to 1 over 15 degrees
-              const val = 1.0 - t
-              r = val; g = val; b = val
-            } else {
-              // Full night - black
-              r = nightColor.r
-              g = nightColor.g
-              b = nightColor.b
-            }
-
-          } else {
-            if (sunAngle < 85) {
+          // COLOR MODE colors
+          if (sunAngle < 85) {
+            r = 1.0
+            g = 0.85
+            b = 0.0
+          } else if (sunAngle < 88) {
+            const t = (sunAngle - 85) / 3
+            if (isSunset) {
               r = 1.0
-              g = 0.85
+              g = 0.85 - t * 0.25
               b = 0.0
-            } else if (sunAngle < 88) {
-              const t = (sunAngle - 85) / 3
-              if (isSunset) {
-                r = 1.0
-                g = 0.85 - t * 0.25
-                b = 0.0
-              } else {
-                r = 1.0
-                g = 0.85 - t * 0.2
-                b = 0.0 + t * 0.1
-              }
-            } else if (sunAngle < 91) {
-              const t = (sunAngle - 88) / 3
-              if (isSunset) {
-                r = 1.0
-                g = 0.6 - t * 0.15
-                b = 0.0
-              } else {
-                r = 1.0
-                g = 0.65 - t * 0.15
-                b = 0.1 + t * 0.15
-              }
-            } else if (sunAngle < 94) {
-              const t = (sunAngle - 91) / 3
-              if (isSunset) {
-                r = 1.0 - t * 0.15
-                g = 0.45 - t * 0.15
-                b = 0.0 + t * 0.1
-              } else {
-                r = 1.0 - t * 0.2
-                g = 0.5 - t * 0.15
-                b = 0.25 + t * 0.2
-              }
-            } else if (sunAngle < 97) {
-              const t = (sunAngle - 94) / 3
-              if (isSunset) {
-                r = 0.85 - t * 0.4
-                g = 0.3 - t * 0.15
-                b = 0.1 + t * 0.15
-              } else {
-                r = 0.8 - t * 0.2
-                g = 0.35 - t * 0.15
-                b = 0.45 + t * 0.25
-              }
-            } else if (sunAngle < 100) {
-              const t = (sunAngle - 97) / 3
-              if (isSunset) {
-                r = 0.45 - t * 0.35
-                g = 0.15 - t * 0.0
-                b = 0.25 + t * 0.25
-              } else {
-                r = 0.6 - t * 0.5
-                g = 0.2 - t * 0.05
-                b = 0.7 - t * 0.2
-              }
             } else {
-              r = 0.1
-              g = 0.15
-              b = 0.5
+              r = 1.0
+              g = 0.85 - t * 0.2
+              b = 0.0 + t * 0.1
             }
+          } else if (sunAngle < 91) {
+            const t = (sunAngle - 88) / 3
+            if (isSunset) {
+              r = 1.0
+              g = 0.6 - t * 0.15
+              b = 0.0
+            } else {
+              r = 1.0
+              g = 0.65 - t * 0.15
+              b = 0.1 + t * 0.15
+            }
+          } else if (sunAngle < 94) {
+            const t = (sunAngle - 91) / 3
+            if (isSunset) {
+              r = 1.0 - t * 0.15
+              g = 0.45 - t * 0.15
+              b = 0.0 + t * 0.1
+            } else {
+              r = 1.0 - t * 0.2
+              g = 0.5 - t * 0.15
+              b = 0.25 + t * 0.2
+            }
+          } else if (sunAngle < 97) {
+            const t = (sunAngle - 94) / 3
+            if (isSunset) {
+              r = 0.85 - t * 0.4
+              g = 0.3 - t * 0.15
+              b = 0.1 + t * 0.15
+            } else {
+              r = 0.8 - t * 0.2
+              g = 0.35 - t * 0.15
+              b = 0.45 + t * 0.25
+            }
+          } else if (sunAngle < 100) {
+            const t = (sunAngle - 97) / 3
+            if (isSunset) {
+              r = 0.45 - t * 0.35
+              g = 0.15 - t * 0.0
+              b = 0.25 + t * 0.25
+            } else {
+              r = 0.6 - t * 0.5
+              g = 0.2 - t * 0.05
+              b = 0.7 - t * 0.2
+            }
+          } else {
+            r = 0.1
+            g = 0.15
+            b = 0.5
           }
-
-          preCalculatedColors.push({ r, g, b })
+          
+          preCalculatedColorsColor.push({ r, g, b })
+          
+          // B&W MODE colors
+          const dayColor = { r: 1, g: 1, b: 1 }
+          const nightColor = { r: 0, g: 0, b: 0 }
+          
+          if (sunAngle < 85) {
+            r = dayColor.r
+            g = dayColor.g
+            b = dayColor.b
+          } else if (sunAngle < 100) {
+            const t = (sunAngle - 85) / 15
+            const val = 1.0 - t
+            r = val; g = val; b = val
+          } else {
+            r = nightColor.r
+            g = nightColor.g
+            b = nightColor.b
+          }
+          
+          preCalculatedColorsBW.push({ r, g, b })
           
           // Detect transitions
           const isDaylight = sunAngle < 95
@@ -1001,7 +1003,8 @@ function App() {
         flightGroup.userData.routePoints = points
         flightGroup.userData.routeCurve = new THREE.CatmullRomCurve3(points)
         flightGroup.userData.segmentData = segmentData
-        flightGroup.userData.preCalculatedColors = preCalculatedColors
+        flightGroup.userData.preCalculatedColorsColor = preCalculatedColorsColor
+        flightGroup.userData.preCalculatedColorsBW = preCalculatedColorsBW
         flightGroup.userData.preCalculatedTransitions = preCalculatedTransitions
 
         // Pre-create transition labels
@@ -1030,6 +1033,7 @@ function App() {
           // Store the transition info on the sprite
           sprite.userData.transitionT = trans.t
           sprite.userData.transitionIndex = trans.index
+          sprite.userData.timeText = trans.time
           
           flightGroup.add(sprite)
           transitionLabelsRef.current.push(sprite)
@@ -1132,9 +1136,20 @@ function App() {
           const arrIcon = isBWMode ? '/arrival-icon-bw.svg' : '/arrival-icon.svg'
                 
         const departureLabel = await createLabelWithOffset(departureCode, departure.lat, departure.lon, depIcon)
+        departureLabel.userData.code = departureCode
+        departureLabel.userData.lat = departure.lat
+        departureLabel.userData.lon = departure.lon
+        departureLabel.userData.type = 'departure'
         flightGroup.add(departureLabel)
+        departureLabelRef.current = departureLabel
+
         const arrivalLabel = await createLabelWithOffset(arrivalCode, arrival.lat, arrival.lon, arrIcon)
+        arrivalLabel.userData.code = arrivalCode
+        arrivalLabel.userData.lat = arrival.lat
+        arrivalLabel.userData.lon = arrival.lon
+        arrivalLabel.userData.type = 'arrival'
         flightGroup.add(arrivalLabel)
+        arrivalLabelRef.current = arrivalLabel
         
         sceneRef.current.add(flightGroup)
         flightLineRef.current = flightGroup
@@ -1144,7 +1159,7 @@ function App() {
 
       createLabels()
 
-      }, [flightPath, flightResults, departureTime, departureCode, arrivalCode, isBWMode])
+      }, [flightPath, flightResults, departureTime, departureCode, arrivalCode])
 
     // Effect to show/hide all airports
     useEffect(() => {
@@ -2013,7 +2028,7 @@ function App() {
       }
     }, [isBWMode])
 
-// Update scene background when B&W mode changes
+    // Update scene background when B&W mode changes
     useEffect(() => {
       if (!sceneRef.current) return
       
@@ -2035,8 +2050,80 @@ function App() {
       const startAmbient = ambientLightRef.current?.intensity || 0.3
       const startOverlay = twilightSphereRef.current?.material.uniforms.overlayIntensity.value || 0.65
       
+      // Prepare label texture updates (load new icons immediately)
+      let newDepTexture = null
+      let newArrTexture = null
+      let newPlaneTexture = isBWMode ? planeBWTextureRef.current : planeTextureRef.current
+      
+      const createLabelTexture = (code, type, callback) => {
+        const iconSrc = type === 'departure' 
+          ? (isBWMode ? '/departure-icon-bw.svg' : '/departure-icon.svg')
+          : (isBWMode ? '/arrival-icon-bw.svg' : '/arrival-icon.svg')
+        
+        const icon = new Image()
+        icon.onload = () => {
+          const canvas = document.createElement('canvas')
+          const context = canvas.getContext('2d')
+          canvas.width = 320
+          canvas.height = 110
+          
+          const radius = 64
+          context.fillStyle = isBWMode ? '#f0f0f0' : '#0c0c0c'
+          context.beginPath()
+          context.moveTo(radius, 0)
+          context.lineTo(canvas.width - radius, 0)
+          context.quadraticCurveTo(canvas.width, 0, canvas.width, radius)
+          context.lineTo(canvas.width, canvas.height - radius)
+          context.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height)
+          context.lineTo(radius, canvas.height)
+          context.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius)
+          context.lineTo(0, radius)
+          context.quadraticCurveTo(0, 0, radius, 0)
+          context.closePath()
+          context.fill()
+          
+          context.font = 'bold 56px system-ui, -apple-system, sans-serif'
+          const textWidth = context.measureText(code).width
+          const iconSize = 48
+          const gap = 28
+          const totalWidth = iconSize + gap + textWidth
+          const startX = (canvas.width - totalWidth) / 2
+          
+          const iconY = (canvas.height - iconSize) / 2 - 1
+          context.drawImage(icon, startX, iconY, iconSize, iconSize)
+          
+          context.fillStyle = isBWMode ? '#1a1a1a' : '#ffffff'
+          context.textAlign = 'left'
+          context.textBaseline = 'middle'
+          context.fillText(code, startX + iconSize + gap, canvas.height / 2)
+          
+          callback(new THREE.CanvasTexture(canvas))
+        }
+        icon.src = iconSrc
+      }
+      
+      // Start loading new textures
+      if (departureLabelRef.current?.userData.code) {
+        createLabelTexture(departureLabelRef.current.userData.code, 'departure', (tex) => {
+          newDepTexture = tex
+        })
+      }
+      if (arrivalLabelRef.current?.userData.code) {
+        createLabelTexture(arrivalLabelRef.current.userData.code, 'arrival', (tex) => {
+          newArrTexture = tex
+        })
+      }
+      
+      // Store original opacities
+      const depOriginalOpacity = departureLabelRef.current?.material.opacity || 1
+      const arrOriginalOpacity = arrivalLabelRef.current?.material.opacity || 1
+      const planeOriginalOpacity = planeIconRef.current?.material.opacity || 1
+      
+      // Track if textures have been swapped (at midpoint)
+      let texturesSwapped = false
+      
       // Animate the transition
-      const duration = 300 // milliseconds
+      const duration = 400 // milliseconds
       const startTime = Date.now()
       
       const animateTransition = () => {
@@ -2057,11 +2144,11 @@ function App() {
           twilightSphereRef.current.material.uniforms.overlayIntensity.value = 
             startOverlay + (targets.overlayIntensity - startOverlay) * easeT
         }
-
+        
         // Interpolate glow
         if (glowRef.current) {
           const startGlowColor = isBWMode ? new THREE.Vector3(1.5, 1.5, 1.5) : new THREE.Vector3(0.5, 0.5, 0.5)
-          const endGlowColor = isBWMode ? new THREE.Vector3(0.5, 0.5, 0.5) : new THREE.Vector3(1.0, 1.0, 1.0)
+          const endGlowColor = isBWMode ? new THREE.Vector3(0.5, 0.5, 0.5) : new THREE.Vector3(1.5, 1.5, 1.5)
           
           glowRef.current.material.uniforms.glowColor.value.set(
             startGlowColor.x + (endGlowColor.x - startGlowColor.x) * easeT,
@@ -2070,7 +2157,7 @@ function App() {
           )
           
           // Switch blending mode at the midpoint
-          if (t >= 0.5) {
+          if (t >= 0.5 && !texturesSwapped) {
             glowRef.current.material.blending = isBWMode ? THREE.NormalBlending : THREE.AdditiveBlending
           }
         }
@@ -2089,20 +2176,94 @@ function App() {
           })
         }
         
+        // Interpolate departure/arrival dots color
+        if (flightLineRef.current) {
+          const startDotColor = isBWMode ? new THREE.Color(0xe0e0e0) : new THREE.Color(0x1a1a1a)
+          const endDotColor = isBWMode ? new THREE.Color(0x1a1a1a) : new THREE.Color(0xe0e0e0)
+          const currentDotColor = new THREE.Color().lerpColors(startDotColor, endDotColor, easeT)
+          
+          flightLineRef.current.traverse((child) => {
+            if (child.isMesh && child.geometry.type === 'SphereGeometry') {
+              child.material.color.copy(currentDotColor)
+            }
+          })
+        }
+        
+        // Fade labels and plane: fade out first half, swap at midpoint, fade in second half
+        const fadeT = t < 0.5 ? 1 - (t * 2) : (t - 0.5) * 2  // 1->0->1
+        
+        if (departureLabelRef.current) {
+          departureLabelRef.current.material.opacity = depOriginalOpacity * fadeT
+        }
+        if (arrivalLabelRef.current) {
+          arrivalLabelRef.current.material.opacity = arrOriginalOpacity * fadeT
+        }
+        if (planeIconRef.current) {
+          planeIconRef.current.material.opacity = planeOriginalOpacity * fadeT
+        }
+        
+        // Swap textures at midpoint
+        if (t >= 0.5 && !texturesSwapped) {
+          texturesSwapped = true
+          
+          // Swap plane texture
+          if (planeIconRef.current && newPlaneTexture) {
+            planeIconRef.current.material.map = newPlaneTexture
+            planeIconRef.current.material.needsUpdate = true
+          }
+          
+          // Swap departure label texture
+          if (departureLabelRef.current && newDepTexture) {
+            if (departureLabelRef.current.material.map) {
+              departureLabelRef.current.material.map.dispose()
+            }
+            departureLabelRef.current.material.map = newDepTexture
+            departureLabelRef.current.material.needsUpdate = true
+          }
+          
+          // Swap arrival label texture
+          if (arrivalLabelRef.current && newArrTexture) {
+            if (arrivalLabelRef.current.material.map) {
+              arrivalLabelRef.current.material.map.dispose()
+            }
+            arrivalLabelRef.current.material.map = newArrTexture
+            arrivalLabelRef.current.material.needsUpdate = true
+          }
+          
+          // Update transition labels
+          transitionLabelsRef.current.forEach(label => {
+            const timeText = label.userData.timeText
+            if (timeText && label.material.map) {
+              const canvas = document.createElement('canvas')
+              const context = canvas.getContext('2d')
+              canvas.width = 200
+              canvas.height = 100
+              
+              context.fillStyle = isBWMode ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)'
+              context.font = '40px system-ui'
+              context.textAlign = 'center'
+              context.textBaseline = 'middle'
+              context.fillText(timeText, canvas.width / 2, canvas.height / 2)
+              
+              label.material.map.dispose()
+              label.material.map = new THREE.CanvasTexture(canvas)
+              label.material.needsUpdate = true
+            }
+          })
+        }
+        
         if (t < 1) {
           requestAnimationFrame(animateTransition)
         } else {
-          // At the end, set non-animatable values
-          
-          // Plane icon
+          // Ensure final opacities are restored
+          if (departureLabelRef.current) {
+            departureLabelRef.current.material.opacity = depOriginalOpacity
+          }
+          if (arrivalLabelRef.current) {
+            arrivalLabelRef.current.material.opacity = arrOriginalOpacity
+          }
           if (planeIconRef.current) {
-            if (isBWMode && planeBWTextureRef.current) {
-              planeIconRef.current.material.map = planeBWTextureRef.current
-              planeIconRef.current.material.needsUpdate = true
-            } else if (!isBWMode && planeTextureRef.current) {
-              planeIconRef.current.material.map = planeTextureRef.current
-              planeIconRef.current.material.needsUpdate = true
-            }
+            planeIconRef.current.material.opacity = planeOriginalOpacity
           }
         }
       }
