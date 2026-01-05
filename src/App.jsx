@@ -1038,17 +1038,40 @@ function App() {
           ring.userData.transitionT = trans.t
           flightGroup.add(ring)
           
-          // Create the label
+          // Create the label with icon
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
-          canvas.width = 200
+          canvas.width = 280
           canvas.height = 100
           
-          context.fillStyle = isBWMode ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)'
-          context.font = '40px system-ui'
-          context.textAlign = 'center'
-          context.textBaseline = 'middle'
-          context.fillText(trans.time, canvas.width / 2, canvas.height / 2)
+          const iconSrc = trans.type === 'sunrise'
+            ? (isBWMode ? '/sunrise-icon-bw.svg' : '/sunrise-icon.svg')
+            : (isBWMode ? '/sunset-icon-bw.svg' : '/sunset-icon.svg')
+          
+          const icon = new Image()
+          icon.onload = () => {
+            context.fillStyle = isBWMode ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)'
+            context.font = '40px system-ui'
+            
+            const iconSize = 40
+            const gap = 12
+            const textWidth = context.measureText(trans.time).width
+            const totalWidth = iconSize + gap + textWidth
+            const startX = (canvas.width - totalWidth) / 2
+            
+            // Draw icon
+            const iconY = (canvas.height - iconSize) / 2
+            context.drawImage(icon, startX, iconY, iconSize, iconSize)
+            
+            // Draw text
+            context.textAlign = 'left'
+            context.textBaseline = 'middle'
+            context.fillText(trans.time, startX + iconSize + gap, canvas.height / 2)
+            
+            sprite.material.map = new THREE.CanvasTexture(canvas)
+            sprite.material.needsUpdate = true
+          }
+          icon.src = iconSrc
           
           const texture = new THREE.CanvasTexture(canvas)
           const material = new THREE.SpriteMaterial({ 
@@ -1057,12 +1080,13 @@ function App() {
             depthTest: true
           })
           const sprite = new THREE.Sprite(material)
-          sprite.scale.set(0.1, 0.05, 1)
+          sprite.scale.set(0.14, 0.05, 1)
           sprite.visible = false
           
           sprite.userData.transitionT = trans.t
           sprite.userData.transitionIndex = trans.index
           sprite.userData.timeText = trans.time
+          sprite.userData.transitionType = trans.type  // 'sunrise' or 'sunset'
           sprite.userData.ring = ring  // Link ring to label
           
           flightGroup.add(sprite)
@@ -1089,7 +1113,7 @@ function App() {
         return new Promise((resolve) => {
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
-          canvas.width = 320
+          canvas.width = 300
           canvas.height = 110  // Shorter (was 128)
           
           // Load icon first
@@ -1137,7 +1161,7 @@ function App() {
               sizeAttenuation: false,
             })
             const sprite = new THREE.Sprite(material)
-            sprite.scale.set(0.12, 0.042, 1)  // Adjusted height scale
+            sprite.scale.set(0.1125, 0.042, 1)
             
             resolve(sprite)
           }
@@ -2094,7 +2118,7 @@ function App() {
         icon.onload = () => {
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
-          canvas.width = 320
+          canvas.width = 300
           canvas.height = 110
           
           const radius = 64
@@ -2263,21 +2287,42 @@ function App() {
           // Update transition labels and rings
           transitionLabelsRef.current.forEach(label => {
             const timeText = label.userData.timeText
+            const transitionType = label.userData.transitionType
             if (timeText && label.material.map) {
               const canvas = document.createElement('canvas')
               const context = canvas.getContext('2d')
-              canvas.width = 200
+              canvas.width = 280
               canvas.height = 100
               
-              context.fillStyle = isBWMode ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)'
-              context.font = '40px system-ui'
-              context.textAlign = 'center'
-              context.textBaseline = 'middle'
-              context.fillText(timeText, canvas.width / 2, canvas.height / 2)
+              const iconSrc = transitionType === 'sunrise'
+                ? (isBWMode ? '/sunrise-icon-bw.svg' : '/sunrise-icon.svg')
+                : (isBWMode ? '/sunset-icon-bw.svg' : '/sunset-icon.svg')
               
-              label.material.map.dispose()
-              label.material.map = new THREE.CanvasTexture(canvas)
-              label.material.needsUpdate = true
+              const icon = new Image()
+              icon.onload = () => {
+                context.fillStyle = isBWMode ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)'
+                context.font = '40px system-ui'
+                
+                const iconSize = 40
+                const gap = 12
+                const textWidth = context.measureText(timeText).width
+                const totalWidth = iconSize + gap + textWidth
+                const startX = (canvas.width - totalWidth) / 2
+                
+                // Draw icon (slightly higher to align with text baseline)
+                const iconY = (canvas.height - iconSize) / 2 - 7
+                context.drawImage(icon, startX, iconY, iconSize, iconSize)
+                
+                // Draw text
+                context.textAlign = 'left'
+                context.textBaseline = 'middle'
+                context.fillText(timeText, startX + iconSize + gap, canvas.height / 2)
+                
+                label.material.map.dispose()
+                label.material.map = new THREE.CanvasTexture(canvas)
+                label.material.needsUpdate = true
+              }
+              icon.src = iconSrc
             }
             
             // Update ring color
