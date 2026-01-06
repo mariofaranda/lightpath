@@ -47,6 +47,7 @@ function App() {
   const [autoRotate, setAutoRotate] = useState(true)
   const [isBWMode, setIsBWMode] = useState(false)
   const [followPlaneMode, setFollowPlaneMode] = useState(false)
+  const [showTwilightLines, setShowTwilightLines] = useState(false) 
   
   // Accordion/Info State
   const [expandedSection, setExpandedSection] = useState(null)
@@ -70,7 +71,13 @@ function App() {
   const planeIconRef = useRef(null)
   const twilightSphereRef = useRef(null)
   const glowRef = useRef(null)
-  
+  const twilightLinesRef = useRef({
+    terminator: null,
+    civil: null,
+    nautical: null,
+    astronomical: null
+  })
+ 
   // Three.js Materials & Textures
   const earthMaterialRef = useRef(null)
   const ambientLightRef = useRef(null)
@@ -106,6 +113,87 @@ function App() {
       g: parseInt(rgb[1]) / 255,
       b: parseInt(rgb[2]) / 255
     }
+  }
+
+  // Calculate solar declination for a given date
+  const calculateSolarDeclination = (date) => {
+    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000)
+    return -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10))
+  }
+
+  // Calculate points along a twilight boundary for a given solar elevation angle
+  const calculateTwilightBoundary = (sunDirection, elevationAngle) => {
+    // elevationAngle: -6° for civil, -12° for nautical, -18° for astronomical
+    const points = []
+    const numPoints = 360 // One point per degree of longitude
+    
+    // The twilight boundary is where the sun is at the specified elevation angle below horizon
+    // This forms a small circle on the sphere
+    const angleFromSubsolar = 90 - elevationAngle // Convert elevation to angle from subsolar point
+    const angularRadius = angleFromSubsolar * Math.PI / 180
+    
+    // Subsolar point is in the direction of sunDirection
+    const subsolarLat = Math.asin(sunDirection.y) 
+    const subsolarLon = Math.atan2(sunDirection.z, -sunDirection.x)
+    
+    // Create points around the small circle
+    for (let i = 0; i <= numPoints; i++) {
+      const bearing = (i / numPoints) * 2 * Math.PI
+      
+      // Calculate point on small circle using spherical trigonometry
+      const lat = Math.asin(
+        Math.sin(subsolarLat) * Math.cos(angularRadius) +
+        Math.cos(subsolarLat) * Math.sin(angularRadius) * Math.cos(bearing)
+      )
+      
+      const lon = subsolarLon + Math.atan2(
+        Math.sin(bearing) * Math.sin(angularRadius) * Math.cos(subsolarLat),
+        Math.cos(angularRadius) - Math.sin(subsolarLat) * Math.sin(lat)
+      )
+      
+      // Convert to 3D coordinates on sphere surface (radius slightly above Earth surface)
+      const radius = 2.005 // Just above the Earth surface
+      const phi = Math.PI / 2 - lat
+      const theta = lon
+      
+      const x = -radius * Math.sin(phi) * Math.cos(theta)
+      const y = radius * Math.cos(phi)
+      const z = radius * Math.sin(phi) * Math.sin(theta)
+      
+      points.push(new THREE.Vector3(x, y, z))
+    }
+    
+    return points
+  }
+
+  // Update twilight boundary lines based on sun direction
+  const updateTwilightLines = (sunDirection, currentTime) => {
+    if (!twilightLinesRef.current.terminator) return  // Remove showTwilightLines check here
+    
+    // Calculate boundaries for each twilight type on BOTH sides of Earth
+    const terminatorPointsDay = calculateTwilightBoundary(sunDirection, 0, currentTime)
+    const civilPointsDay = calculateTwilightBoundary(sunDirection, -6, currentTime)
+    const nauticalPointsDay = calculateTwilightBoundary(sunDirection, -12, currentTime)
+    const astronomicalPointsDay = calculateTwilightBoundary(sunDirection, -18, currentTime)
+    
+    // Antisolar point (opposite direction)
+    const antisolarDirection = sunDirection.clone().multiplyScalar(-1)
+    const terminatorPointsNight = calculateTwilightBoundary(antisolarDirection, 0, currentTime)
+    const civilPointsNight = calculateTwilightBoundary(antisolarDirection, -6, currentTime)
+    const nauticalPointsNight = calculateTwilightBoundary(antisolarDirection, -12, currentTime)
+    const astronomicalPointsNight = calculateTwilightBoundary(antisolarDirection, -18, currentTime)
+    
+    // Combine both sides
+    const terminatorPoints = [...terminatorPointsDay, ...terminatorPointsNight]
+    const civilPoints = [...civilPointsDay, ...civilPointsNight]
+    const nauticalPoints = [...nauticalPointsDay, ...nauticalPointsNight]
+    const astronomicalPoints = [...astronomicalPointsDay, ...astronomicalPointsNight]
+    
+    // Update geometries
+    twilightLinesRef.current.terminator.geometry.setFromPoints(terminatorPoints)
+    twilightLinesRef.current.civil.geometry.setFromPoints(civilPoints)
+    twilightLinesRef.current.nautical.geometry.setFromPoints(nauticalPoints)
+    twilightLinesRef.current.astronomical.geometry.setFromPoints(astronomicalPoints)
   }
 
   // Keep refs in sync with state
@@ -344,8 +432,7 @@ function App() {
     const subsolarLongitude = -hoursSinceNoon * 15 // 15° per hour westward
 
     // Solar declination (latitude where sun is overhead)
-    const dayOfYear = Math.floor((initialTime - new Date(initialTime.getFullYear(), 0, 0)) / 86400000)
-    const subsolarLatitude = -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10))
+    const subsolarLatitude = calculateSolarDeclination(initialTime)
 
     // Convert subsolar point to 3D direction
     const phi = (90 - subsolarLatitude) * (Math.PI / 180)
@@ -469,6 +556,57 @@ function App() {
     scene.add(twilightSphere)
     twilightSphereRef.current = twilightSphere
 
+    // Create twilight boundary lines
+
+    // Terminator line (sun at horizon, 0°)
+    const terminatorLineGeometry = new THREE.BufferGeometry()
+    const terminatorLineMaterial = new THREE.LineBasicMaterial({ 
+      color: 0xffffff, 
+      opacity: 0.8, 
+      transparent: true 
+    })
+    const terminatorLine = new THREE.Line(terminatorLineGeometry, terminatorLineMaterial)
+    terminatorLine.visible = true
+    scene.add(terminatorLine)
+
+    // Civil twilight line
+    const civilLineGeometry = new THREE.BufferGeometry()
+    const civilLineMaterial = new THREE.LineBasicMaterial({ 
+      color: 0xffffff, 
+      opacity: 0.6,  // Changed from 0.9
+      transparent: true 
+    })
+    const civilLine = new THREE.Line(civilLineGeometry, civilLineMaterial)
+    civilLine.visible = true
+    scene.add(civilLine)
+
+    const nauticalLineGeometry = new THREE.BufferGeometry()
+    const nauticalLineMaterial = new THREE.LineBasicMaterial({ 
+      color: 0xffffff, 
+      opacity: 0.4,  // Changed from 0.6
+      transparent: true 
+    })
+    const nauticalLine = new THREE.Line(nauticalLineGeometry, nauticalLineMaterial)
+    nauticalLine.visible = true
+    scene.add(nauticalLine)
+
+    const astronomicalLineGeometry = new THREE.BufferGeometry()
+    const astronomicalLineMaterial = new THREE.LineBasicMaterial({ 
+      color: 0xffffff, 
+      opacity: 0.2,  // Changed from 0.3
+      transparent: true 
+    })
+    const astronomicalLine = new THREE.Line(astronomicalLineGeometry, astronomicalLineMaterial)
+    astronomicalLine.visible = true
+    scene.add(astronomicalLine)
+
+    twilightLinesRef.current = {
+      terminator: terminatorLine,
+      civil: civilLine,
+      nautical: nauticalLine,
+      astronomical: astronomicalLine
+    }
+
     // Store references for updating
     const sceneRefs = {
       sunLight,
@@ -492,9 +630,8 @@ function App() {
       const hoursSinceNoon = (currentTime - solarNoon) / (1000 * 60 * 60)
       const subsolarLongitude = -hoursSinceNoon * 15
 
-      // Solar declination
-      const dayOfYear = Math.floor((currentTime - new Date(currentTime.getFullYear(), 0, 0)) / 86400000)
-      const subsolarLatitude = -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10))
+      // Calculate solar declination
+      const sunDeclination = calculateSolarDeclination(currentTime)
 
       // Convert subsolar point to 3D direction
       const phi = (90 - subsolarLatitude) * (Math.PI / 180)
@@ -512,6 +649,12 @@ function App() {
       // Update twilight shader
       sceneRefs.twilightMaterial.uniforms.sunDirection.value.copy(sunDirection.normalize())
       sceneRefs.twilightMaterial.uniforms.sunDeclination.value = subsolarLatitude
+
+      // Update twilight shader
+      sceneRefs.twilightMaterial.uniforms.sunDirection.value.copy(sunDirection.normalize())
+
+      // Update twilight boundary lines
+      updateTwilightLines(sunDirection.normalize(), new Date(acceleratedTime))
     }
 
     function updateSunPositionForTime(time) {
@@ -522,8 +665,7 @@ function App() {
       const subsolarLongitude = -hoursSinceNoon * 15
     
       // Solar declination
-      const dayOfYear = Math.floor((time - new Date(time.getFullYear(), 0, 0)) / 86400000)
-      const subsolarLatitude = -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10))
+      const subsolarLatitude = calculateSolarDeclination(time)
     
       // Convert subsolar point to 3D direction
       const phi = (90 - subsolarLatitude) * (Math.PI / 180)
@@ -541,6 +683,12 @@ function App() {
       // Update twilight shader
       sceneRefs.twilightMaterial.uniforms.sunDirection.value.copy(sunDirection.normalize())
       sceneRefs.twilightMaterial.uniforms.sunDeclination.value = subsolarLatitude
+
+      // Update twilight shader
+      sceneRefs.twilightMaterial.uniforms.sunDirection.value.copy(sunDirection.normalize())
+
+      // Update twilight boundary lines
+      updateTwilightLines(sunDirection.normalize(), time)
     }
 
     // 5. Animation loop
@@ -992,8 +1140,7 @@ function App() {
         const hoursSinceNoon = (time - solarNoon) / (1000 * 60 * 60)
         const subsolarLongitude = -hoursSinceNoon * 15
 
-        const dayOfYear = Math.floor((time - new Date(time.getFullYear(), 0, 0)) / 86400000)
-        const subsolarLatitude = -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10))
+        const subsolarLatitude = calculateSolarDeclination(time)
 
         // Calculate angular distance from subsolar point
         const lat1 = subsolarLatitude * Math.PI / 180
@@ -1820,6 +1967,15 @@ function App() {
     }, [showTimezones])
 
     useEffect(() => {
+      if (twilightLinesRef.current.terminator) {
+        twilightLinesRef.current.terminator.visible = showTwilightLines
+        twilightLinesRef.current.civil.visible = showTwilightLines
+        twilightLinesRef.current.nautical.visible = showTwilightLines
+        twilightLinesRef.current.astronomical.visible = showTwilightLines
+      }
+    }, [showTwilightLines])
+
+    useEffect(() => {
       if (!isPlaying || !flightDataRef.current) return
       
       // Get flight distance in km from flightResults
@@ -1891,6 +2047,11 @@ function App() {
           setShowGraticule(!showGraticule)
         }
 
+        // L for twilight lines toggle
+        if (e.key === 'l' || e.key === 'L') {
+          setShowTwilightLines(!showTwilightLines)
+        }
+
       }
       
       window.addEventListener('keydown', handleKeyPress)
@@ -1899,7 +2060,7 @@ function App() {
         window.removeEventListener('keydown', handleKeyPress)
       }
 
-    }, [isPlaying, flightResults, animationProgress, showAirports, showPlaneIcon, showTimezones, showGraticule])
+    }, [isPlaying, flightResults, animationProgress, showAirports, showPlaneIcon, showTimezones, showGraticule, showTwilightLines])
 
     // Highlight current timezone during flight
     useEffect(() => {
@@ -1925,8 +2086,7 @@ function App() {
       const hoursSinceNoon = (time - solarNoon) / (1000 * 60 * 60)
       const subsolarLongitude = -hoursSinceNoon * 15
     
-      const dayOfYear = Math.floor((time - new Date(time.getFullYear(), 0, 0)) / 86400000)
-      const subsolarLatitude = -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10))
+      const subsolarLatitude = calculateSolarDeclination(time)
     
       // Calculate angular distance from subsolar point
       const lat1 = subsolarLatitude * Math.PI / 180
@@ -2690,6 +2850,17 @@ function App() {
               onChange={(e) => setShowTimezones(e.target.checked)}
             />
             <span>(T) Show Timezones</span>
+          </label>
+        </div>
+
+        <div className="twilight-toggle-overlay">
+          <label>
+            <input 
+              type="checkbox"
+              checked={showTwilightLines}
+              onChange={(e) => setShowTwilightLines(e.target.checked)}
+            />
+            <span>(L) Twilight Lines</span>
           </label>
         </div>
 

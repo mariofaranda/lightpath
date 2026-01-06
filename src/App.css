@@ -20,7 +20,8 @@
 .bw-mode .plane-toggle-overlay label span,
 .bw-mode .timezone-toggle-overlay label span,
 .bw-mode .bw-toggle-overlay label span,
-.bw-mode .follow-toggle-overlay label span {
+.bw-mode .follow-toggle-overlay label span
+.bw-mode .twilight-toggle-overlay label span {
   color: rgba(40, 40, 40, 0.8);
 }
 
@@ -632,6 +633,28 @@ canvas {
   width: 16px;
   height: 16px;
   accent-color: #2d2e2f;
+}
+
+.twilight-toggle-overlay {
+  position: absolute;
+  bottom: 30px;
+  left: 20px;
+  pointer-events: all;
+}
+
+.twilight-toggle-overlay label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.twilight-toggle-overlay input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
 }
 
 .route-plane-icon {
