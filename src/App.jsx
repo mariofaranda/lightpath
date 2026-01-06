@@ -7,6 +7,9 @@ import tzlookup from 'tz-lookup'
 import { DateTime } from 'luxon'
 import packageJson from '../package.json'
 import ReactMarkdown from 'react-markdown'
+import { Line2 } from 'three/examples/jsm/lines/Line2.js'
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 
 function App() {
   // ===== STATE =====
@@ -72,10 +75,14 @@ function App() {
   const twilightSphereRef = useRef(null)
   const glowRef = useRef(null)
   const twilightLinesRef = useRef({
-    terminator: null,
-    civil: null,
-    nautical: null,
-    astronomical: null
+    terminatorDay: null,
+    terminatorNight: null,
+    civilDay: null,
+    civilNight: null,
+    nauticalDay: null,
+    nauticalNight: null,
+    astronomicalDay: null,
+    astronomicalNight: null
   })
  
   // Three.js Materials & Textures
@@ -152,7 +159,7 @@ function App() {
       )
       
       // Convert to 3D coordinates on sphere surface (radius slightly above Earth surface)
-      const radius = 2.005 // Just above the Earth surface
+      const radius = 2.0005 // Just above the Earth surface
       const phi = Math.PI / 2 - lat
       const theta = lon
       
@@ -168,32 +175,58 @@ function App() {
 
   // Update twilight boundary lines based on sun direction
   const updateTwilightLines = (sunDirection, currentTime) => {
-    if (!twilightLinesRef.current.terminator) return  // Remove showTwilightLines check here
+    if (!twilightLinesRef.current.terminatorDay) return
     
-    // Calculate boundaries for each twilight type on BOTH sides of Earth
+    // Calculate boundaries for day side
     const terminatorPointsDay = calculateTwilightBoundary(sunDirection, 0, currentTime)
     const civilPointsDay = calculateTwilightBoundary(sunDirection, -6, currentTime)
     const nauticalPointsDay = calculateTwilightBoundary(sunDirection, -12, currentTime)
     const astronomicalPointsDay = calculateTwilightBoundary(sunDirection, -18, currentTime)
     
-    // Antisolar point (opposite direction)
+    // Calculate boundaries for night side
     const antisolarDirection = sunDirection.clone().multiplyScalar(-1)
     const terminatorPointsNight = calculateTwilightBoundary(antisolarDirection, 0, currentTime)
     const civilPointsNight = calculateTwilightBoundary(antisolarDirection, -6, currentTime)
     const nauticalPointsNight = calculateTwilightBoundary(antisolarDirection, -12, currentTime)
     const astronomicalPointsNight = calculateTwilightBoundary(antisolarDirection, -18, currentTime)
     
-    // Combine both sides
-    const terminatorPoints = [...terminatorPointsDay, ...terminatorPointsNight]
-    const civilPoints = [...civilPointsDay, ...civilPointsNight]
-    const nauticalPoints = [...nauticalPointsDay, ...nauticalPointsNight]
-    const astronomicalPoints = [...astronomicalPointsDay, ...astronomicalPointsNight]
+    // Helper to convert Vector3 array to flat position array for Line2
+    const pointsToPositions = (points) => {
+      const positions = []
+      points.forEach(p => {
+        positions.push(p.x, p.y, p.z)
+      })
+      return positions
+    }
     
-    // Update geometries
-    twilightLinesRef.current.terminator.geometry.setFromPoints(terminatorPoints)
-    twilightLinesRef.current.civil.geometry.setFromPoints(civilPoints)
-    twilightLinesRef.current.nautical.geometry.setFromPoints(nauticalPoints)
-    twilightLinesRef.current.astronomical.geometry.setFromPoints(astronomicalPoints)
+    // Update geometries - Line2 uses setPositions instead of setFromPoints
+    if (terminatorPointsDay.length > 0) {
+      twilightLinesRef.current.terminatorDay.geometry.setPositions(pointsToPositions(terminatorPointsDay))
+      twilightLinesRef.current.terminatorNight.geometry.setPositions(pointsToPositions(terminatorPointsNight))
+    }
+    
+    if (civilPointsDay.length > 0) {
+      twilightLinesRef.current.civilDay.geometry.setPositions(pointsToPositions(civilPointsDay))
+      twilightLinesRef.current.civilNight.geometry.setPositions(pointsToPositions(civilPointsNight))
+      twilightLinesRef.current.civilDay.computeLineDistances()  // ADD THIS
+      twilightLinesRef.current.civilNight.computeLineDistances()  // ADD THIS
+    }
+
+    if (nauticalPointsDay.length > 0) {
+      twilightLinesRef.current.nauticalDay.geometry.setPositions(pointsToPositions(nauticalPointsDay))
+      twilightLinesRef.current.nauticalNight.geometry.setPositions(pointsToPositions(nauticalPointsNight))
+      twilightLinesRef.current.nauticalDay.computeLineDistances()  // ADD THIS
+      twilightLinesRef.current.nauticalNight.computeLineDistances()  // ADD THIS
+    }
+
+    if (astronomicalPointsDay.length > 0) {
+      twilightLinesRef.current.astronomicalDay.geometry.setPositions(pointsToPositions(astronomicalPointsDay))
+      twilightLinesRef.current.astronomicalNight.geometry.setPositions(pointsToPositions(astronomicalPointsNight))
+      twilightLinesRef.current.astronomicalDay.computeLineDistances()  // ADD THIS
+      twilightLinesRef.current.astronomicalNight.computeLineDistances()  // ADD THIS
+    }
+    
+    // Line2 handles dashed lines automatically, no need to call computeLineDistances()
   }
 
   // Keep refs in sync with state
@@ -556,55 +589,67 @@ function App() {
     scene.add(twilightSphere)
     twilightSphereRef.current = twilightSphere
 
-    // Create twilight boundary lines
+    // Create twilight boundary lines - separate for day and night sides
 
-    // Terminator line (sun at horizon, 0°)
-    const terminatorLineGeometry = new THREE.BufferGeometry()
-    const terminatorLineMaterial = new THREE.LineBasicMaterial({ 
-      color: 0xffffff, 
-      opacity: 0.8, 
-      transparent: true 
-    })
-    const terminatorLine = new THREE.Line(terminatorLineGeometry, terminatorLineMaterial)
-    terminatorLine.visible = true
-    scene.add(terminatorLine)
+    // Helper to create a Line2 with given material properties
+    const createTwilightLine = (color, opacity, linewidth, dashed = false, dashSize = 0, gapSize = 0, depthWrite = true) => {
+      const material = new LineMaterial({
+        color: color,
+        opacity: opacity,
+        transparent: true,
+        linewidth: linewidth,
+        dashed: dashed,
+        dashSize: dashSize,
+        gapSize: gapSize,
+        dashScale: 1,
+        worldUnits: false,
+        depthWrite: depthWrite  // ADD THIS
+      })
+      
+      const geometry = new LineGeometry()
+      const line = new Line2(geometry, material)
+      line.visible = false
+      line.renderOrder = 10
+      return line
+    }
 
-    // Civil twilight line
-    const civilLineGeometry = new THREE.BufferGeometry()
-    const civilLineMaterial = new THREE.LineBasicMaterial({ 
-      color: 0xffffff, 
-      opacity: 0.6,  // Changed from 0.9
-      transparent: true 
-    })
-    const civilLine = new THREE.Line(civilLineGeometry, civilLineMaterial)
-    civilLine.visible = true
-    scene.add(civilLine)
+    // Terminator lines (solid) - with depthWrite disabled
+    const terminatorLineDay = createTwilightLine(0xffffff, 0.6, 1, false, 0, 0, false)  // Last param = depthWrite false
+    scene.add(terminatorLineDay)
 
-    const nauticalLineGeometry = new THREE.BufferGeometry()
-    const nauticalLineMaterial = new THREE.LineBasicMaterial({ 
-      color: 0xffffff, 
-      opacity: 0.4,  // Changed from 0.6
-      transparent: true 
-    })
-    const nauticalLine = new THREE.Line(nauticalLineGeometry, nauticalLineMaterial)
-    nauticalLine.visible = true
-    scene.add(nauticalLine)
+    const terminatorLineNight = createTwilightLine(0xffffff, 0.6, 1, false, 0, 0, false)  // Last param = depthWrite false
+    scene.add(terminatorLineNight)
 
-    const astronomicalLineGeometry = new THREE.BufferGeometry()
-    const astronomicalLineMaterial = new THREE.LineBasicMaterial({ 
-      color: 0xffffff, 
-      opacity: 0.2,  // Changed from 0.3
-      transparent: true 
-    })
-    const astronomicalLine = new THREE.Line(astronomicalLineGeometry, astronomicalLineMaterial)
-    astronomicalLine.visible = true
-    scene.add(astronomicalLine)
+    // Civil twilight lines (dashed)
+    const civilLineDay = createTwilightLine(0xffffff, 0.4, 1, true, 0.03, 0.025)  // dashed
+    scene.add(civilLineDay)
+
+    const civilLineNight = createTwilightLine(0xffffff, 0.4, 1, true, 0.03, 0.025)
+    scene.add(civilLineNight)
+
+    // Nautical twilight lines (dotted - small gaps)
+    const nauticalLineDay = createTwilightLine(0xffffff, 0.3, 2, true, 0.005, 0.03)  // dotted
+    scene.add(nauticalLineDay)
+
+    const nauticalLineNight = createTwilightLine(0xffffff, 0.3, 2, true, 0.005, 0.03)
+    scene.add(nauticalLineNight)
+
+    // Astronomical twilight lines (dotted - large gaps)
+    const astronomicalLineDay = createTwilightLine(0xffffff, 0.2, 1.5, true, 0.005, 0.015)  // dotted
+    scene.add(astronomicalLineDay)
+
+    const astronomicalLineNight = createTwilightLine(0xffffff, 0.2, 1.5, true, 0.005, 0.015)
+    scene.add(astronomicalLineNight)
 
     twilightLinesRef.current = {
-      terminator: terminatorLine,
-      civil: civilLine,
-      nautical: nauticalLine,
-      astronomical: astronomicalLine
+      terminatorDay: terminatorLineDay,
+      terminatorNight: terminatorLineNight,
+      civilDay: civilLineDay,
+      civilNight: civilLineNight,
+      nauticalDay: nauticalLineDay,
+      nauticalNight: nauticalLineNight,
+      astronomicalDay: astronomicalLineDay,
+      astronomicalNight: astronomicalLineNight
     }
 
     // Store references for updating
@@ -1004,6 +1049,13 @@ function App() {
     }
     
     window.addEventListener('resize', handleResize)
+
+    // Update Line2 materials resolution
+    Object.values(twilightLinesRef.current).forEach(line => {
+      if (line && line.material.resolution) {
+        line.material.resolution.set(window.innerWidth, window.innerHeight)
+      }
+    })
 
     // 7. Cleanup
     return () => {
@@ -1967,11 +2019,15 @@ function App() {
     }, [showTimezones])
 
     useEffect(() => {
-      if (twilightLinesRef.current.terminator) {
-        twilightLinesRef.current.terminator.visible = showTwilightLines
-        twilightLinesRef.current.civil.visible = showTwilightLines
-        twilightLinesRef.current.nautical.visible = showTwilightLines
-        twilightLinesRef.current.astronomical.visible = showTwilightLines
+      if (twilightLinesRef.current.terminatorDay) {
+        twilightLinesRef.current.terminatorDay.visible = showTwilightLines
+        twilightLinesRef.current.terminatorNight.visible = showTwilightLines
+        twilightLinesRef.current.civilDay.visible = showTwilightLines
+        twilightLinesRef.current.civilNight.visible = showTwilightLines
+        twilightLinesRef.current.nauticalDay.visible = showTwilightLines
+        twilightLinesRef.current.nauticalNight.visible = showTwilightLines
+        twilightLinesRef.current.astronomicalDay.visible = showTwilightLines
+        twilightLinesRef.current.astronomicalNight.visible = showTwilightLines
       }
     }, [showTwilightLines])
 

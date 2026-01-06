@@ -20,7 +20,7 @@
 .bw-mode .plane-toggle-overlay label span,
 .bw-mode .timezone-toggle-overlay label span,
 .bw-mode .bw-toggle-overlay label span,
-.bw-mode .follow-toggle-overlay label span
+.bw-mode .follow-toggle-overlay label span,
 .bw-mode .twilight-toggle-overlay label span {
   color: rgba(40, 40, 40, 0.8);
 }
