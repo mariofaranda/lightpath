@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import './App.css'
 import SunCalc from 'suncalc'
+import * as solar from 'solar-calculator'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import tzlookup from 'tz-lookup'
 import { DateTime } from 'luxon'
@@ -122,10 +123,10 @@ function App() {
     }
   }
 
-  // Calculate solar declination for a given date
+  // Calculate solar declination for a given date using NOAA equations
   const calculateSolarDeclination = (date) => {
-    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000)
-    return -23.44 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10))
+    const t = solar.century(date)  // Convert to J2000.0 centuries
+    return solar.declination(t)     // Returns declination in degrees
   }
 
   // Calculate points along a twilight boundary for a given solar elevation angle
@@ -1315,10 +1316,17 @@ function App() {
               g = 0.2 - t * 0.05
               b = 0.7 - t * 0.2
             }
+          } else if (sunAngle < 108) {
+            // Deep twilight to astronomical twilight end (100° to 108°)
+            const t = (sunAngle - 100) / 8
+            r = 0.08 - t * 0.03  // Gentler fade
+            g = 0.12 - t * 0.06  // Gentler fade
+            b = 0.35 - t * 0.15  // Gentler fade
           } else {
-            r = 0.1
-            g = 0.15
-            b = 0.5
+            // Complete darkness - beyond astronomical twilight
+            r = 0.05
+            g = 0.06
+            b = 0.20
           }
           
           preCalculatedColorsColor.push({ r, g, b })
@@ -1445,14 +1453,15 @@ function App() {
             const totalWidth = iconSize + gap + textWidth
             const startX = (canvas.width - totalWidth) / 2
             
-            // Draw icon
-            const iconY = (canvas.height - iconSize) / 2
-            context.drawImage(icon, startX, iconY, iconSize, iconSize)
-            
-            // Draw text
+            // Draw text first
             context.textAlign = 'left'
             context.textBaseline = 'middle'
-            context.fillText(trans.time, startX + iconSize + gap, canvas.height / 2)
+            context.fillText(trans.time, startX, canvas.height / 2)
+            
+            // Draw icon after text
+            const iconY = (canvas.height - iconSize) / 2
+            const iconX = startX + textWidth + gap
+            context.drawImage(icon, iconX, iconY, iconSize, iconSize)
             
             sprite.material.map = new THREE.CanvasTexture(canvas)
             sprite.material.needsUpdate = true
@@ -1466,7 +1475,7 @@ function App() {
             depthTest: true
           })
           const sprite = new THREE.Sprite(material)
-          sprite.scale.set(0.14, 0.05, 1)
+          sprite.scale.set(0.20, 0.07, 1)
           sprite.visible = false
           
           sprite.userData.transitionT = trans.t
@@ -1547,7 +1556,7 @@ function App() {
               sizeAttenuation: true,
             })
             const sprite = new THREE.Sprite(material)
-            sprite.scale.set(0.1125, 0.042, 1)
+            sprite.scale.set(0.16, 0.06, 1)
             
             resolve(sprite)
           }
@@ -2030,6 +2039,22 @@ function App() {
         twilightLinesRef.current.astronomicalNight.visible = showTwilightLines
       }
     }, [showTwilightLines])
+
+    useEffect(() => {
+      if (twilightLinesRef.current.terminatorDay) {
+        const color = isBWMode ? 0x202020 : 0xffffff  // Dark gray in BW, white in color
+        
+        // Update all line materials
+        twilightLinesRef.current.terminatorDay.material.color.setHex(color)
+        twilightLinesRef.current.terminatorNight.material.color.setHex(color)
+        twilightLinesRef.current.civilDay.material.color.setHex(color)
+        twilightLinesRef.current.civilNight.material.color.setHex(color)
+        twilightLinesRef.current.nauticalDay.material.color.setHex(color)
+        twilightLinesRef.current.nauticalNight.material.color.setHex(color)
+        twilightLinesRef.current.astronomicalDay.material.color.setHex(color)
+        twilightLinesRef.current.astronomicalNight.material.color.setHex(color)
+      }
+    }, [isBWMode])
 
     useEffect(() => {
       if (!isPlaying || !flightDataRef.current) return
@@ -2776,20 +2801,23 @@ function App() {
                 
                 const iconSize = 40
                 const gap = 12
-                const textWidth = context.measureText(timeText).width
-                const totalWidth = iconSize + gap + textWidth
+                const textWidth = context.measureText(timeText).width  // FIXED: use timeText not trans.time
+                const totalWidth = textWidth + gap + iconSize
                 const startX = (canvas.width - totalWidth) / 2
                 
-                // Draw icon (slightly higher to align with text baseline)
-                const iconY = (canvas.height - iconSize) / 2 - 7
-                context.drawImage(icon, startX, iconY, iconSize, iconSize)
+                const baselineY = canvas.height / 2 + 15
                 
                 // Draw text
                 context.textAlign = 'left'
-                context.textBaseline = 'middle'
-                context.fillText(timeText, startX + iconSize + gap, canvas.height / 2)
+                context.textBaseline = 'bottom'
+                context.fillText(timeText, startX, baselineY)  // FIXED: use timeText
                 
-                label.material.map.dispose()
+                // Draw icon - bottom edge at same baseline
+                const iconX = startX + textWidth + gap
+                const iconY = baselineY - iconSize
+                context.drawImage(icon, iconX, iconY, iconSize, iconSize)
+                
+                label.material.map.dispose()  // FIXED: use label not sprite
                 label.material.map = new THREE.CanvasTexture(canvas)
                 label.material.needsUpdate = true
               }
@@ -2862,7 +2890,7 @@ function App() {
 
         </div>
 
-        <div className="airport-toggle-overlay">
+        <div className="airport-toggle-overlay toggle-overlay">
           <label>
             <input 
               type="checkbox"
@@ -2873,7 +2901,7 @@ function App() {
           </label>
         </div>
 
-        <div className="graticule-toggle-overlay">
+        <div className="graticule-toggle-overlay toggle-overlay">
           <label>
             <input 
               type="checkbox"
@@ -2884,21 +2912,7 @@ function App() {
           </label>
         </div>
 
-        <div className="plane-toggle-overlay">
-          <label>
-            <input 
-              type="checkbox"
-              checked={showPlaneIcon}
-              onChange={(e) => {
-                setShowPlaneIcon(e.target.checked)
-                showPlaneIconRef.current = e.target.checked
-              }}
-            />
-            <span>(P) Show Airplane</span>
-          </label>
-        </div>
-
-        <div className="timezone-toggle-overlay">
+        <div className="timezone-toggle-overlay toggle-overlay">
           <label>
             <input 
               type="checkbox"
@@ -2909,7 +2923,7 @@ function App() {
           </label>
         </div>
 
-        <div className="twilight-toggle-overlay">
+        <div className="twilight-toggle-overlay toggle-overlay">
           <label>
             <input 
               type="checkbox"

@@ -58,6 +58,29 @@
   background-color: rgba(40, 40, 40, 0.3);
 }
 
+/* Shared toggle overlay styles */
+.toggle-overlay {
+  position: absolute;
+  left: 20px;
+  pointer-events: all;
+}
+
+.toggle-overlay label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.toggle-overlay input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #2d2e2f;
+}
+
 .app {
   width: 100vw;
   height: 100vh;
@@ -154,10 +177,7 @@ canvas {
 }
 
 .airport-toggle-overlay {
-  position: absolute;
   bottom: 120px;
-  left: 20px;
-  pointer-events: all;
 }
 
 .airport-toggle-overlay label {
@@ -177,10 +197,7 @@ canvas {
 }
 
 .graticule-toggle-overlay {
-  position: absolute;
   bottom: 90px;
-  left: 20px;
-  pointer-events: all;
 }
 
 .graticule-toggle-overlay label {
@@ -589,34 +606,8 @@ canvas {
   max-width: 200px; 
 }
 
-.plane-toggle-overlay {
-  position: absolute;
-  bottom: 150px;
-  left: 20px;
-  pointer-events: all;
-}
-
-.plane-toggle-overlay label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.plane-toggle-overlay input[type="checkbox"] {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  accent-color: #2d2e2f;
-}
-
 .timezone-toggle-overlay {
-  position: absolute;
   bottom: 60px;
-  left: 20px;
-  pointer-events: all;
 }
 
 .timezone-toggle-overlay label {
@@ -636,10 +627,7 @@ canvas {
 }
 
 .twilight-toggle-overlay {
-  position: absolute;
   bottom: 30px;
-  left: 20px;
-  pointer-events: all;
 }
 
 .twilight-toggle-overlay label {
