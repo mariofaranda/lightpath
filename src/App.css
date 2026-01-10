@@ -6,38 +6,107 @@
   --path-night-color: rgb(25, 38, 128);
 }
 
+* {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
 .bw-mode {
-  --bg-color: #f5f5f5;  /* White newspaper background */
-  --path-day-color: rgb(255, 255, 255);  /* White (daylight) */
-  --path-twilight-warm: rgb(180, 180, 180);  /* Light gray */
-  --path-twilight-cool: rgb(120, 120, 120);  /* Medium gray */
-  --path-night-color: rgb(0, 0, 0);  /* Dark (night) */
+  /* Background colors */
+  --bg-color: #f5f5f5;
+  --path-day-color: rgb(255, 255, 255);
+  --path-twilight-warm: rgb(180, 180, 180);
+  --path-twilight-cool: rgb(120, 120, 120);
+  --path-night-color: rgb(0, 0, 0);
+  
+  /* BW mode color palette */
+  --bw-text-primary: rgba(40, 40, 40, 0.9);
+  --bw-text-secondary: rgba(40, 40, 40, 0.7);
+  --bw-text-tertiary: rgba(40, 40, 40, 0.4);
+  --bw-text-dark: rgb(20, 20, 20);
+  --bw-bg-panel: rgba(255, 255, 255, 0.8);
+  --bw-bg-button: rgba(40, 40, 40, 0.8);
+  --bw-bg-button-hover: rgba(40, 40, 40, 0.9);
+  --bw-bg-input: rgba(255, 255, 255, 0.3);
+  --bw-border: rgba(50, 50, 50, 0.5);
+  --bw-border-light: rgba(40, 40, 40, 0.3);
 }
 
+/* Text colors */
 .bw-mode .nav-link,
-.bw-mode .airport-toggle-overlay label span,
-.bw-mode .graticule-toggle-overlay label span,
-.bw-mode .plane-toggle-overlay label span,
-.bw-mode .timezone-toggle-overlay label span,
-.bw-mode .bw-toggle-overlay label span,
-.bw-mode .follow-toggle-overlay label span,
-.bw-mode .twilight-toggle-overlay label span {
-  color: rgba(40, 40, 40, 0.8);
-}
-
-.bw-mode .nav-link:hover {
-  color: rgba(40, 40, 40, 1);
-}
-
+.bw-mode .toggle-overlay label span,
 .bw-mode .accordion-content {
-  color: rgba(40, 40, 40, 0.9);
+  color: var(--bw-text-primary);
+}
+
+.bw-mode .flight-input h3,
+.bw-mode .flight-input,
+.bw-mode .input-group label,
+.bw-mode .input-group input,
+.bw-mode .animation-controls,
+.bw-mode .animation-route,
+.bw-mode .time-value,
+.bw-mode .airport-code,
+.bw-mode .airport-date,
+.bw-mode .result-label,
+.bw-mode .result-value,
+.bw-mode .datetime-group label,
+.bw-mode .datetime-group input[type="datetime-local"] {
+  color: var(--bw-text-primary);
+}
+
+.bw-mode .animation-time {
+  color: var(--bw-text-secondary);
+}
+
+.bw-mode .airport-name-inline {
+  color: var(--bw-text-tertiary);
 }
 
 .bw-mode .accordion-content h1,
 .bw-mode .accordion-content h2 {
-  color: rgb(20, 20, 20);
+  color: var(--bw-text-dark);
 }
 
+/* Hover states */
+.bw-mode .nav-link:hover {
+  color: rgba(40, 40, 40, 1);
+}
+
+.bw-mode .flight-input .collapse-button {
+  color: rgba(40, 40, 40, 0.6) !important;
+}
+
+.bw-mode .flight-input .collapse-button:hover {
+  color: var(--bw-text-primary) !important;
+}
+
+/* Panels */
+.bw-mode .flight-input,
+.bw-mode .animation-controls {
+  background: var(--bw-bg-panel);
+  border-color: var(--bw-border);
+}
+
+/* Buttons */
+.bw-mode .flight-input button,
+.bw-mode .play-button {
+  background: var(--bw-bg-button);
+  color: #f5f5f5;
+}
+
+.bw-mode .flight-input button:hover,
+.bw-mode .play-button:hover {
+  background: var(--bw-bg-button-hover);
+}
+
+/* Inputs */
+.bw-mode .input-group input,
+.bw-mode .datetime-group input[type="datetime-local"] {
+  background: var(--bw-bg-input);
+  border-color: var(--bw-border-light);
+}
+
+/* Toggle switches */
 .bw-mode .toggle-slider {
   background-color: rgba(40, 40, 40, 0.15);
 }
@@ -57,6 +126,7 @@
 .bw-mode .toggle-switch input:disabled + .toggle-slider:before {
   background-color: rgba(40, 40, 40, 0.3);
 }
+
 
 /* Shared toggle overlay styles */
 .toggle-overlay {
@@ -228,7 +298,6 @@ canvas {
   top: 20px;
   left: 20px;
   color: #cccccc;
-  font-family: system-ui, -apple-system, sans-serif;
   font-size: 14px;
   pointer-events: none;
   user-select: none;
@@ -256,7 +325,6 @@ canvas {
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  font-family: system-ui, -apple-system, sans-serif;
   width: 400px;
   transition: padding 0.25s ease-in-out;
 }
@@ -289,7 +357,6 @@ canvas {
   font-weight: 600;
   background: rgba(255, 255, 255, 0.05);
   color: #fff;
-  font-family: system-ui, -apple-system, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }

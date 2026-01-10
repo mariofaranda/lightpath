@@ -3317,7 +3317,11 @@ function App() {
               <div className="flight-info-center">
                 <div className="animation-route">
                   <span>{departureCode}</span>
-                  <img src="/plane-icon.svg" alt="→" className="route-plane-icon" />
+                  <img 
+                    src={isBWMode ? "/plane-icon-bw.svg" : "/plane-icon.svg"} 
+                    className="route-plane-icon" 
+                    alt="plane" 
+                  />
                   <span>{arrivalCode}</span>
                 </div>
                 <div className="animation-time">
@@ -3358,8 +3362,16 @@ function App() {
                 className="time-slider"
               />
               <div className="time-labels">
-                <img src="/departure-icon.svg" alt="Departure" className="slider-icon" />
-                <img src="/arrival-icon.svg" alt="Arrival" className="slider-icon" />
+                <img 
+                  src={isBWMode ? "/departure-icon-bw.svg" : "/departure-icon.svg"} 
+                  className="slider-icon" 
+                  alt="departure" 
+                />
+                <img 
+                  src={isBWMode ? "/arrival-icon-bw.svg" : "/arrival-icon.svg"} 
+                  className="slider-icon" 
+                  alt="arrival" 
+                />
               </div>
             </div>
             
