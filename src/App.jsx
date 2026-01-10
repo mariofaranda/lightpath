@@ -129,38 +129,71 @@ function App() {
     return solar.declination(t)     // Returns declination in degrees
   }
 
-  // Calculate points along a twilight boundary for a given solar elevation angle
-  const calculateTwilightBoundary = (sunDirection, elevationAngle) => {
-    // elevationAngle: -6° for civil, -12° for nautical, -18° for astronomical
+  // Calculate points along a twilight boundary with latitude-dependent width
+  const calculateTwilightBoundary = (sunDirection, baseElevationAngle, currentTime) => {
     const points = []
-    const numPoints = 360 // One point per degree of longitude
+    const numPoints = 360
     
-    // The twilight boundary is where the sun is at the specified elevation angle below horizon
-    // This forms a small circle on the sphere
-    const angleFromSubsolar = 90 - elevationAngle // Convert elevation to angle from subsolar point
-    const angularRadius = angleFromSubsolar * Math.PI / 180
+    // Calculate solar declination
+    const sunDeclination = calculateSolarDeclination(currentTime)
     
-    // Subsolar point is in the direction of sunDirection
-    const subsolarLat = Math.asin(sunDirection.y) 
+    // Subsolar point
+    const subsolarLat = Math.asin(sunDirection.y)
     const subsolarLon = Math.atan2(sunDirection.z, -sunDirection.x)
     
-    // Create points around the small circle
+    // Base approach: start with simple circle, then adjust radius based on latitude
     for (let i = 0; i <= numPoints; i++) {
       const bearing = (i / numPoints) * 2 * Math.PI
       
-      // Calculate point on small circle using spherical trigonometry
-      const lat = Math.asin(
-        Math.sin(subsolarLat) * Math.cos(angularRadius) +
-        Math.cos(subsolarLat) * Math.sin(angularRadius) * Math.cos(bearing)
+      // Start with base angular radius (for equator)
+      const baseAngularRadius = (90 - baseElevationAngle) * Math.PI / 180
+      
+      // Calculate initial point
+      let lat = Math.asin(
+        Math.sin(subsolarLat) * Math.cos(baseAngularRadius) +
+        Math.cos(subsolarLat) * Math.sin(baseAngularRadius) * Math.cos(bearing)
       )
       
-      const lon = subsolarLon + Math.atan2(
-        Math.sin(bearing) * Math.sin(angularRadius) * Math.cos(subsolarLat),
-        Math.cos(angularRadius) - Math.sin(subsolarLat) * Math.sin(lat)
+      let lon = subsolarLon + Math.atan2(
+        Math.sin(bearing) * Math.sin(baseAngularRadius) * Math.cos(subsolarLat),
+        Math.cos(baseAngularRadius) - Math.sin(subsolarLat) * Math.sin(lat)
       )
       
-      // Convert to 3D coordinates on sphere surface (radius slightly above Earth surface)
-      const radius = 2.0005 // Just above the Earth surface
+      // Now adjust based on latitude effects (only for twilight lines, not terminator)
+      if (baseElevationAngle !== 0) {
+        const latDeg = lat * 180 / Math.PI
+        const absLatitude = Math.abs(latDeg)
+        
+        // Calculate obliquity factor (from shader)
+        const latitudeFactor = Math.cos(absLatitude * Math.PI / 180)
+        const declinationDiff = Math.abs(latDeg - sunDeclination)
+        const declinationFactor = 1.0 + (declinationDiff / 90.0) * 0.5
+        const latitudeEffect = 1.0 + (1.4 - 1.0) * (1.0 - latitudeFactor)
+        const obliquityFactor = latitudeEffect * declinationFactor
+        
+        // Apply obliquity factor with reduced strength (blend with base value)
+        const blendFactor = 0.2  // Only apply 20% of the obliquity effect
+        const effectiveObliquity = 1.0 + (obliquityFactor - 1.0) * blendFactor
+        
+        // Adjust the elevation angle based on obliquity
+        const adjustedElevation = baseElevationAngle * effectiveObliquity
+        
+        // Recalculate with adjusted radius
+        const adjustedAngularRadius = (90 - adjustedElevation) * Math.PI / 180
+        
+        lat = Math.asin(
+          Math.sin(subsolarLat) * Math.cos(adjustedAngularRadius) +
+          Math.cos(subsolarLat) * Math.sin(adjustedAngularRadius) * Math.cos(bearing)
+        )
+        
+        lon = subsolarLon + Math.atan2(
+          Math.sin(bearing) * Math.sin(adjustedAngularRadius) * Math.cos(subsolarLat),
+          Math.cos(adjustedAngularRadius) - Math.sin(subsolarLat) * Math.sin(lat)
+        )
+      }
+      
+      // Convert to 3D coordinates
+      const radius = 2.001
       const phi = Math.PI / 2 - lat
       const theta = lon
       
@@ -228,6 +261,7 @@ function App() {
     }
     
     // Line2 handles dashed lines automatically, no need to call computeLineDistances()
+    
   }
 
   // Keep refs in sync with state
@@ -615,31 +649,31 @@ function App() {
     }
 
     // Terminator lines (solid) - with depthWrite disabled
-    const terminatorLineDay = createTwilightLine(0xffffff, 0.6, 1, false, 0, 0, false)  // Last param = depthWrite false
+    const terminatorLineDay = createTwilightLine(0xd8e8f8, 0.6, 1, false, 0, 0, false)  // Last param = depthWrite false
     scene.add(terminatorLineDay)
 
-    const terminatorLineNight = createTwilightLine(0xffffff, 0.6, 1, false, 0, 0, false)  // Last param = depthWrite false
+    const terminatorLineNight = createTwilightLine(0xd8e8f8, 0.6, 1, false, 0, 0, false)  // Last param = depthWrite false
     scene.add(terminatorLineNight)
 
     // Civil twilight lines (dashed)
-    const civilLineDay = createTwilightLine(0xffffff, 0.4, 1, true, 0.03, 0.025)  // dashed
+    const civilLineDay = createTwilightLine(0x6ba3d8, 0.4, 1, true, 0.025, 0.025)  // dashed
     scene.add(civilLineDay)
 
-    const civilLineNight = createTwilightLine(0xffffff, 0.4, 1, true, 0.03, 0.025)
+    const civilLineNight = createTwilightLine(0x6ba3d8, 0.4, 1, true, 0.025, 0.025)
     scene.add(civilLineNight)
 
     // Nautical twilight lines (dotted - small gaps)
-    const nauticalLineDay = createTwilightLine(0xffffff, 0.3, 2, true, 0.005, 0.03)  // dotted
+    const nauticalLineDay = createTwilightLine(0x4a7fb8, 0.4, 2, true, 0.005, 0.03)  // dotted
     scene.add(nauticalLineDay)
 
-    const nauticalLineNight = createTwilightLine(0xffffff, 0.3, 2, true, 0.005, 0.03)
+    const nauticalLineNight = createTwilightLine(0x4a7fb8, 0.4, 2, true, 0.005, 0.03)
     scene.add(nauticalLineNight)
 
     // Astronomical twilight lines (dotted - large gaps)
-    const astronomicalLineDay = createTwilightLine(0xffffff, 0.2, 1.5, true, 0.005, 0.015)  // dotted
+    const astronomicalLineDay = createTwilightLine(0x3d6fa0, 0.4, 1.8, true, 0.005, 0.015)  // dotted
     scene.add(astronomicalLineDay)
 
-    const astronomicalLineNight = createTwilightLine(0xffffff, 0.2, 1.5, true, 0.005, 0.015)
+    const astronomicalLineNight = createTwilightLine(0x3d6fa0, 0.4, 1.8, true, 0.005, 0.015)
     scene.add(astronomicalLineNight)
 
     twilightLinesRef.current = {
@@ -1237,6 +1271,9 @@ function App() {
         })
       }
 
+      // Calculate solar declination once for the entire flight
+        const sunDeclination = calculateSolarDeclination(departureTime)     
+
       // Pre-calculate colors for entire path - BOTH color and B&W versions
         const preCalculatedColorsColor = []
         const preCalculatedColorsBW = []
@@ -1351,8 +1388,28 @@ function App() {
           
           preCalculatedColorsBW.push({ r, g, b })
           
-          // Detect transitions
-          const isDaylight = sunAngle < 95
+          // Detect transitions with latitude-dependent threshold
+          const lat = segmentInfo.lat
+          const latDeg = lat * 180 / Math.PI
+          const absLatitude = Math.abs(latDeg)
+
+          // Calculate latitude-dependent threshold (matching twilight boundary calculation)
+          const latitudeFactor = Math.cos(absLatitude * Math.PI / 180)
+          const declinationDiff = Math.abs(latDeg - sunDeclination)
+          const declinationFactor = 1.0 + (declinationDiff / 90.0) * 0.5
+          const latitudeEffect = 1.0 + (1.4 - 1.0) * (1.0 - latitudeFactor)
+          const obliquityFactor = latitudeEffect * declinationFactor
+
+          // Apply same blend factor as twilight boundaries
+          const blendFactor = 0.15
+          const effectiveObliquity = 1.0 + (obliquityFactor - 1.0) * blendFactor
+
+          // Adjust the civil twilight threshold (-6°) based on latitude
+          const baseCivilThreshold = 95  // 90° + 6° for civil twilight
+          const adjustedThreshold = 90 + (6 * effectiveObliquity)
+
+          const isDaylight = sunAngle < 96  // 90° + 6° (civil twilight)
+
           if (i > 0 && isDaylight !== lastWasDaylight) {
             const t = i / segmentData.length
             const elapsedMs = t * flightDurationMs
@@ -1365,7 +1422,6 @@ function App() {
               time: `${hours}h ${minutes}m`,
               type: isDaylight ? 'sunrise' : 'sunset'
             })
-            
             lastWasDaylight = isDaylight
           }
         }
@@ -1417,6 +1473,8 @@ function App() {
         flightGroup.userData.preCalculatedColorsColor = preCalculatedColorsColor
         flightGroup.userData.preCalculatedColorsBW = preCalculatedColorsBW
         flightGroup.userData.preCalculatedTransitions = preCalculatedTransitions
+
+        console.log('Transitions detected:', preCalculatedTransitions)
 
         // Pre-create transition labels and rings
         preCalculatedTransitions.forEach(trans => {
@@ -2028,31 +2086,115 @@ function App() {
     }, [showTimezones])
 
     useEffect(() => {
-      if (twilightLinesRef.current.terminatorDay) {
-        twilightLinesRef.current.terminatorDay.visible = showTwilightLines
-        twilightLinesRef.current.terminatorNight.visible = showTwilightLines
-        twilightLinesRef.current.civilDay.visible = showTwilightLines
-        twilightLinesRef.current.civilNight.visible = showTwilightLines
-        twilightLinesRef.current.nauticalDay.visible = showTwilightLines
-        twilightLinesRef.current.nauticalNight.visible = showTwilightLines
-        twilightLinesRef.current.astronomicalDay.visible = showTwilightLines
-        twilightLinesRef.current.astronomicalNight.visible = showTwilightLines
+      if (!twilightLinesRef.current.terminatorDay) return
+      
+      const duration = 300 // milliseconds
+      const startTime = Date.now()
+      
+      // Store starting opacities
+      const startOpacities = {
+        terminator: twilightLinesRef.current.terminatorDay.material.opacity,
+        civil: twilightLinesRef.current.civilDay.material.opacity,
+        nautical: twilightLinesRef.current.nauticalDay.material.opacity,
+        astronomical: twilightLinesRef.current.astronomicalDay.material.opacity
       }
+      
+      // Target opacities based on toggle state
+      const targetOpacities = showTwilightLines ? {
+        terminator: 0.8,
+        civil: 0.6,
+        nautical: 0.4,
+        astronomical: 0.2
+      } : {
+        terminator: 0,
+        civil: 0,
+        nautical: 0,
+        astronomical: 0
+      }
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime
+        const t = Math.min(elapsed / duration, 1)
+        const easeT = t * (2 - t) // Ease out
+        
+        // Interpolate opacities
+        const currentOpacities = {
+          terminator: startOpacities.terminator + (targetOpacities.terminator - startOpacities.terminator) * easeT,
+          civil: startOpacities.civil + (targetOpacities.civil - startOpacities.civil) * easeT,
+          nautical: startOpacities.nautical + (targetOpacities.nautical - startOpacities.nautical) * easeT,
+          astronomical: startOpacities.astronomical + (targetOpacities.astronomical - startOpacities.astronomical) * easeT
+        }
+        
+        // Update all line materials
+        twilightLinesRef.current.terminatorDay.material.opacity = currentOpacities.terminator
+        twilightLinesRef.current.terminatorNight.material.opacity = currentOpacities.terminator
+        twilightLinesRef.current.civilDay.material.opacity = currentOpacities.civil
+        twilightLinesRef.current.civilNight.material.opacity = currentOpacities.civil
+        twilightLinesRef.current.nauticalDay.material.opacity = currentOpacities.nautical
+        twilightLinesRef.current.nauticalNight.material.opacity = currentOpacities.nautical
+        twilightLinesRef.current.astronomicalDay.material.opacity = currentOpacities.astronomical
+        twilightLinesRef.current.astronomicalNight.material.opacity = currentOpacities.astronomical
+        
+        if (t < 1) {
+          requestAnimationFrame(animate)
+        } else {
+          // At end of fade-out, hide the lines
+          if (!showTwilightLines) {
+            twilightLinesRef.current.terminatorDay.visible = false
+            twilightLinesRef.current.terminatorNight.visible = false
+            twilightLinesRef.current.civilDay.visible = false
+            twilightLinesRef.current.civilNight.visible = false
+            twilightLinesRef.current.nauticalDay.visible = false
+            twilightLinesRef.current.nauticalNight.visible = false
+            twilightLinesRef.current.astronomicalDay.visible = false
+            twilightLinesRef.current.astronomicalNight.visible = false
+          }
+        }
+      }
+      
+      // At start of fade-in, show the lines
+      if (showTwilightLines) {
+        twilightLinesRef.current.terminatorDay.visible = true
+        twilightLinesRef.current.terminatorNight.visible = true
+        twilightLinesRef.current.civilDay.visible = true
+        twilightLinesRef.current.civilNight.visible = false // Night side twilight hidden
+        twilightLinesRef.current.nauticalDay.visible = true
+        twilightLinesRef.current.nauticalNight.visible = false
+        twilightLinesRef.current.astronomicalDay.visible = true
+        twilightLinesRef.current.astronomicalNight.visible = false
+      }
+      
+      animate()
+      
     }, [showTwilightLines])
 
     useEffect(() => {
       if (twilightLinesRef.current.terminatorDay) {
-        const color = isBWMode ? 0x202020 : 0xffffff  // Dark gray in BW, white in color
+        // In BW mode: dark gray for all
+        // In color mode: different blues for each twilight type
         
-        // Update all line materials
-        twilightLinesRef.current.terminatorDay.material.color.setHex(color)
-        twilightLinesRef.current.terminatorNight.material.color.setHex(color)
-        twilightLinesRef.current.civilDay.material.color.setHex(color)
-        twilightLinesRef.current.civilNight.material.color.setHex(color)
-        twilightLinesRef.current.nauticalDay.material.color.setHex(color)
-        twilightLinesRef.current.nauticalNight.material.color.setHex(color)
-        twilightLinesRef.current.astronomicalDay.material.color.setHex(color)
-        twilightLinesRef.current.astronomicalNight.material.color.setHex(color)
+        if (isBWMode) {
+          const color = 0x202020  // Dark gray
+          
+          twilightLinesRef.current.terminatorDay.material.color.setHex(color)
+          twilightLinesRef.current.terminatorNight.material.color.setHex(color)
+          twilightLinesRef.current.civilDay.material.color.setHex(color)
+          twilightLinesRef.current.civilNight.material.color.setHex(color)
+          twilightLinesRef.current.nauticalDay.material.color.setHex(color)
+          twilightLinesRef.current.nauticalNight.material.color.setHex(color)
+          twilightLinesRef.current.astronomicalDay.material.color.setHex(color)
+          twilightLinesRef.current.astronomicalNight.material.color.setHex(color)
+        } else {
+          // Color mode: different shades of blue
+          twilightLinesRef.current.terminatorDay.material.color.setHex(0xd8e8f8)  // Pale blue
+          twilightLinesRef.current.terminatorNight.material.color.setHex(0xd8e8f8)
+          twilightLinesRef.current.civilDay.material.color.setHex(0x6ba3d8)  // Light blue
+          twilightLinesRef.current.civilNight.material.color.setHex(0x6ba3d8)
+          twilightLinesRef.current.nauticalDay.material.color.setHex(0x4a7fb8)  // Medium blue
+          twilightLinesRef.current.nauticalNight.material.color.setHex(0x4a7fb8)
+          twilightLinesRef.current.astronomicalDay.material.color.setHex(0x3d6fa0)  // Dark blue
+          twilightLinesRef.current.astronomicalNight.material.color.setHex(0x3d6fa0)
+        }
       }
     }, [isBWMode])
 
